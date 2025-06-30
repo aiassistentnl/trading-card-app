@@ -337,7 +337,7 @@
                     <label class="input-label">N8N Webhook URL</label>
                     <input type="url" id="webhookUrl" class="text-input" 
                            placeholder="https://jouw-n8n-server.com/webhook/cards"
-                           value="https://labgrowns.nl/webhook/37037740-23dd-474d-8ce1-d4b514f44623">
+                           value="https://labgrowns.nl/webhook-test/60406624-b200-493c-aaf3-23f068a09829">
                 </div>
             </div>
         </div>
@@ -350,7 +350,7 @@
                 <div class="upload-subtext">Tik hier of sleep bestanden hiernaartoe</div>
             </div>
             
-            <input type="file" id="fileInput" accept="image/*" multiple capture="environment">
+            <input type="file" id="fileInput" accept="image/*" multiple>
             
             <div id="previewContainer"></div>
             
@@ -427,27 +427,84 @@
             handleFiles(e.dataTransfer.files);
         }
         
-        function handleFiles(files) {
+        async function handleFiles(files) {
             if (uploadInProgress) return;
+            
+            showStatus('loading', 'Foto\'s verwerken...');
             
             const validFiles = Array.from(files).filter(file => {
                 if (!file.type.startsWith('image/')) {
                     showStatus('error', `${file.name} is geen geldige afbeelding`);
                     return false;
                 }
-                if (file.size > 10 * 1024 * 1024) { // 10MB limit
-                    showStatus('error', `${file.name} is te groot (max 10MB)`);
+                if (file.size > 50 * 1024 * 1024) { // 50MB limit before compression
+                    showStatus('error', `${file.name} is te groot (max 50MB)`);
                     return false;
                 }
                 return true;
             });
             
-            selectedFiles = [...selectedFiles, ...validFiles];
+            // Compress each file
+            const compressedFiles = [];
+            for (const file of validFiles) {
+                try {
+                    const compressed = await compressImage(file);
+                    compressedFiles.push(compressed);
+                } catch (error) {
+                    console.error('Compression error:', error);
+                    compressedFiles.push(file); // Fallback to original
+                }
+            }
+            
+            selectedFiles = [...selectedFiles, ...compressedFiles];
             updatePreview();
             
-            if (validFiles.length > 0) {
-                showStatus('success', `${validFiles.length} foto${validFiles.length > 1 ? "'s" : ''} toegevoegd`);
+            if (compressedFiles.length > 0) {
+                const totalSize = compressedFiles.reduce((sum, file) => sum + file.size, 0);
+                const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(1);
+                showStatus('success', `${compressedFiles.length} foto${compressedFiles.length > 1 ? "'s" : ''} toegevoegd (${totalSizeMB}MB)`);
             }
+        }
+        
+        function compressImage(file, maxWidth = 1920, maxHeight = 1920, quality = 0.8) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                
+                img.onload = function() {
+                    // Calculate new dimensions while maintaining aspect ratio
+                    let { width, height } = img;
+                    
+                    if (width > height) {
+                        if (width > maxWidth) {
+                            height = (height * maxWidth) / width;
+                            width = maxWidth;
+                        }
+                    } else {
+                        if (height > maxHeight) {
+                            width = (width * maxHeight) / height;
+                            height = maxHeight;
+                        }
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    // Draw and compress
+                    ctx.drawImage(img, 0, 0, width, height);
+                    
+                    canvas.toBlob((blob) => {
+                        const compressedFile = new File([blob], file.name, {
+                            type: 'image/jpeg',
+                            lastModified: Date.now()
+                        });
+                        resolve(compressedFile);
+                    }, 'image/jpeg', quality);
+                };
+                
+                img.src = URL.createObjectURL(file);
+            });
         }
         
         function updatePreview() {
