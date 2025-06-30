@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Card Uploader</title>
     <meta name="theme-color" content="#007AFF">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -12,33 +12,57 @@
     <style>
         :root {
             --ios-blue: #007AFF;
-            --ios-blue-dark: #0056CC;
-            --ios-green: #34C759;
-            --ios-red: #FF3B30;
-            --ios-orange: #FF9500;
-            --ios-purple: #AF52DE;
+            --ios-blue-dark: #0051D0;
+            --ios-green: #30D158;
+            --ios-red: #FF453A;
+            --ios-orange: #FF9F0A;
+            --ios-purple: #BF5AF2;
+            --ios-pink: #FF2D92;
+            --ios-teal: #40C8E0;
             
             --background-primary: #000000;
             --background-secondary: #1C1C1E;
             --background-tertiary: #2C2C2E;
-            --background-grouped: #000000;
+            --background-quaternary: #3A3A3C;
             
-            --surface-primary: rgba(28, 28, 30, 0.68);
-            --surface-secondary: rgba(44, 44, 46, 0.68);
-            --surface-tertiary: rgba(58, 58, 60, 0.68);
+            --surface-primary: rgba(28, 28, 30, 0.8);
+            --surface-secondary: rgba(44, 44, 46, 0.8);
+            --surface-tertiary: rgba(58, 58, 60, 0.8);
+            --surface-elevated: rgba(44, 44, 46, 0.95);
             
             --text-primary: #FFFFFF;
             --text-secondary: rgba(235, 235, 245, 0.6);
             --text-tertiary: rgba(235, 235, 245, 0.3);
+            --text-quaternary: rgba(235, 235, 245, 0.18);
             
             --fill-primary: rgba(120, 120, 128, 0.2);
             --fill-secondary: rgba(120, 120, 128, 0.16);
             --fill-tertiary: rgba(118, 118, 128, 0.12);
+            --fill-quaternary: rgba(118, 118, 128, 0.08);
             
-            --separator: rgba(84, 84, 88, 0.6);
+            --separator-opaque: #38383A;
+            --separator-non-opaque: rgba(84, 84, 88, 0.6);
             
-            --accent-purple: #6366F1;
-            --accent-blue: #3B82F6;
+            --label-primary: rgba(255, 255, 255, 1);
+            --label-secondary: rgba(235, 235, 245, 0.6);
+            --label-tertiary: rgba(235, 235, 245, 0.3);
+            
+            --system-gray: #8E8E93;
+            --system-gray2: #636366;
+            --system-gray3: #48484A;
+            --system-gray4: #3A3A3C;
+            --system-gray5: #2C2C2E;
+            --system-gray6: #1C1C1E;
+            
+            --radius-small: 8px;
+            --radius-medium: 12px;
+            --radius-large: 16px;
+            --radius-xl: 24px;
+            
+            --shadow-small: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+            --shadow-medium: 0 4px 6px rgba(0, 0, 0, 0.16), 0 2px 4px rgba(0, 0, 0, 0.06);
+            --shadow-large: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
+            --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15), 0 10px 10px rgba(0, 0, 0, 0.04);
         }
         
         * {
@@ -50,63 +74,129 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            background: var(--background-grouped);
+            background: var(--background-primary);
             color: var(--text-primary);
             min-height: 100vh;
             padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
             overflow-x: hidden;
-            line-height: 1.4;
+            line-height: 1.47059;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+            font-synthesis: none;
+            text-rendering: optimizeLegibility;
         }
         
-        .container {
-            max-width: 390px;
+        .app-container {
+            max-width: 393px;
             margin: 0 auto;
-            padding: 0 16px 34px;
+            padding: 0 16px;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
-        }
-        
-        .navigation-bar {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 17px 0 11px;
             position: relative;
         }
         
-        .nav-title {
-            font-size: 17px;
+        /* Dynamic Island */
+        .dynamic-island {
+            position: fixed;
+            top: calc(env(safe-area-inset-top) + 14px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            pointer-events: none;
+        }
+        
+        .island-pill {
+            background: var(--background-secondary);
+            border-radius: 20px;
+            padding: 8px 16px;
+            backdrop-filter: blur(20px);
+            border: 0.5px solid var(--separator-non-opaque);
+            opacity: 0;
+            transform: scale(0.8);
+            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+            box-shadow: var(--shadow-large);
+        }
+        
+        .island-pill.show {
+            opacity: 1;
+            transform: scale(1);
+        }
+        
+        .island-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
             font-weight: 600;
             color: var(--text-primary);
+        }
+        
+        /* Navigation */
+        .navigation-header {
+            padding: 17px 0 11px;
+            position: relative;
+            z-index: 100;
+        }
+        
+        .nav-large-title {
+            font-size: 34px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: 0.37px;
+            line-height: 1.2;
+            margin-bottom: 8px;
+        }
+        
+        .nav-subtitle {
+            font-size: 17px;
+            font-weight: 400;
+            color: var(--text-secondary);
             letter-spacing: -0.41px;
         }
         
         .settings-button {
             position: absolute;
+            top: 17px;
             right: 0;
-            background: none;
+            width: 44px;
+            height: 44px;
+            background: var(--fill-tertiary);
             border: none;
-            padding: 8px;
-            border-radius: 8px;
+            border-radius: 22px;
             color: var(--ios-blue);
-            font-size: 17px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            backdrop-filter: blur(20px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         
         .settings-button:hover {
-            background: var(--fill-tertiary);
+            background: var(--fill-secondary);
+            transform: scale(1.05);
         }
         
-        .section {
-            margin-bottom: 16px;
+        .settings-button:active {
+            transform: scale(0.95);
+        }
+        
+        .settings-icon {
+            width: 18px;
+            height: 18px;
+            background: currentColor;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E") center/contain no-repeat;
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E") center/contain no-repeat;
+        }
+        
+        /* Sections */
+        .section-group {
+            margin-bottom: 32px;
         }
         
         .section-header {
-            padding: 8px 16px 8px 0;
+            padding: 0 4px 8px;
             margin-bottom: 8px;
         }
         
@@ -116,109 +206,232 @@
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: -0.08px;
+            line-height: 1.3;
         }
         
+        /* Cards */
         .card {
             background: var(--surface-primary);
-            border-radius: 12px;
+            border-radius: var(--radius-large);
             backdrop-filter: saturate(180%) blur(20px);
-            border: 0.5px solid var(--separator);
+            border: 0.5px solid var(--separator-non-opaque);
             overflow: hidden;
+            position: relative;
         }
         
-        .settings-card {
-            margin-bottom: 32px;
-            display: none;
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 0.5px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            opacity: 0.6;
         }
         
-        .settings-card.visible {
-            display: block;
+        .card-elevated {
+            background: var(--surface-elevated);
+            box-shadow: var(--shadow-large);
         }
         
         .card-row {
             padding: 16px;
-            border-bottom: 0.5px solid var(--separator);
+            border-bottom: 0.5px solid var(--separator-non-opaque);
+            transition: background-color 0.15s ease-out;
         }
         
         .card-row:last-child {
             border-bottom: none;
         }
         
+        .card-row:active {
+            background: var(--fill-quaternary);
+        }
+        
+        /* Settings Card */
+        .settings-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(20px);
+            z-index: 999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+        }
+        
+        .settings-panel.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .settings-content {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--surface-elevated);
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+            padding: 12px 16px calc(env(safe-area-inset-bottom) + 16px);
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+            backdrop-filter: saturate(180%) blur(20px);
+            border-top: 0.5px solid var(--separator-non-opaque);
+        }
+        
+        .settings-panel.visible .settings-content {
+            transform: translateY(0);
+        }
+        
+        .settings-handle {
+            width: 36px;
+            height: 5px;
+            background: var(--system-gray4);
+            border-radius: 2.5px;
+            margin: 0 auto 20px;
+        }
+        
+        .settings-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: center;
+            margin-bottom: 24px;
+            letter-spacing: -0.45px;
+        }
+        
+        /* Upload Zone */
+        .upload-section {
+            margin-bottom: 24px;
+        }
+        
         .upload-zone {
             padding: 48px 24px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.15s ease-out;
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
             position: relative;
             background: var(--surface-secondary);
-            border: 2px dashed var(--separator);
-            border-radius: 12px;
+            border: 2px dashed var(--separator-non-opaque);
+            border-radius: var(--radius-large);
             margin: 16px;
+            overflow: hidden;
+        }
+        
+        .upload-zone::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(0, 122, 255, 0.05), rgba(191, 90, 242, 0.05));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .upload-zone:hover::before {
+            opacity: 1;
         }
         
         .upload-zone:hover {
             background: var(--surface-tertiary);
             border-color: var(--ios-blue);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-medium);
         }
         
         .upload-zone.dragover {
             background: rgba(0, 122, 255, 0.1);
             border-color: var(--ios-blue);
             transform: scale(1.02);
+            box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
         }
         
-        .upload-icon {
-            width: 64px;
-            height: 64px;
-            margin: 0 auto 16px;
-            background: var(--fill-secondary);
-            border-radius: 32px;
+        .upload-zone.dragover::before {
+            opacity: 1;
+        }
+        
+        .upload-icon-container {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: linear-gradient(135deg, var(--ios-blue), var(--ios-purple));
+            border-radius: 40px;
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
+            box-shadow: var(--shadow-medium);
         }
         
-        .upload-icon::before {
+        .upload-icon-container::before {
             content: '';
-            width: 24px;
-            height: 24px;
-            background: var(--text-secondary);
-            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/%3E%3Ccircle cx='12' cy='13' r='3'/%3E%3C/svg%3E") center/contain no-repeat;
-            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cpath d='M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z'/%3E%3Ccircle cx='12' cy='13' r='3'/%3E%3C/svg%3E") center/contain no-repeat;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            right: 2px;
+            bottom: 2px;
+            background: var(--surface-secondary);
+            border-radius: 38px;
+        }
+        
+        .upload-icon {
+            width: 32px;
+            height: 32px;
+            background: var(--ios-blue);
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 13a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E") center/contain no-repeat;
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 13a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E") center/contain no-repeat;
+            position: relative;
+            z-index: 1;
         }
         
         .upload-text {
-            font-size: 17px;
+            font-size: 20px;
             font-weight: 600;
             color: var(--text-primary);
-            margin-bottom: 4px;
-            letter-spacing: -0.41px;
+            margin-bottom: 8px;
+            letter-spacing: -0.45px;
         }
         
         .upload-subtext {
-            font-size: 15px;
+            font-size: 16px;
             color: var(--text-secondary);
-            letter-spacing: -0.24px;
+            letter-spacing: -0.32px;
         }
         
         #fileInput {
             display: none;
         }
         
+        /* Preview Grid */
+        .preview-section {
+            margin: 0 16px 16px;
+        }
+        
         .preview-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-            gap: 8px;
-            padding: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+            gap: 12px;
         }
         
         .preview-item {
             position: relative;
             aspect-ratio: 1;
-            border-radius: 8px;
+            border-radius: var(--radius-medium);
             overflow: hidden;
             background: var(--fill-secondary);
+            box-shadow: var(--shadow-small);
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+        }
+        
+        .preview-item:hover {
+            transform: scale(1.05);
+            box-shadow: var(--shadow-medium);
         }
         
         .preview-image {
@@ -229,64 +442,72 @@
         
         .remove-button {
             position: absolute;
-            top: 4px;
-            right: 4px;
-            width: 20px;
-            height: 20px;
-            border-radius: 10px;
-            background: rgba(0, 0, 0, 0.7);
+            top: 6px;
+            right: 6px;
+            width: 24px;
+            height: 24px;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.8);
             border: none;
             color: white;
-            font-size: 12px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             backdrop-filter: blur(10px);
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            opacity: 0;
         }
         
-        .remove-button::before {
-            content: '';
-            width: 10px;
-            height: 10px;
-            background: currentColor;
-            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cline x1='18' y1='6' x2='6' y2='18'%3E%3C/line%3E%3Cline x1='6' y1='6' x2='18' y2='18'%3E%3C/line%3E%3C/svg%3E") center/contain no-repeat;
-            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Cline x1='18' y1='6' x2='6' y2='18'%3E%3C/line%3E%3Cline x1='6' y1='6' x2='18' y2='18'%3E%3C/line%3E%3C/svg%3E") center/contain no-repeat;
+        .preview-item:hover .remove-button {
+            opacity: 1;
         }
         
         .remove-button:hover {
             background: var(--ios-red);
+            transform: scale(1.1);
         }
         
+        .remove-button::before {
+            content: '';
+            width: 12px;
+            height: 12px;
+            background: currentColor;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E") center/contain no-repeat;
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E") center/contain no-repeat;
+        }
+        
+        /* Form Fields */
         .form-field {
             display: flex;
             flex-direction: column;
         }
         
         .field-label {
-            font-size: 15px;
+            font-size: 17px;
             font-weight: 400;
             color: var(--text-primary);
             margin-bottom: 8px;
-            letter-spacing: -0.24px;
+            letter-spacing: -0.41px;
         }
         
         .text-input, .url-input, .number-input {
             background: var(--fill-secondary);
             border: none;
-            border-radius: 8px;
-            padding: 12px 16px;
+            border-radius: var(--radius-medium);
+            padding: 16px;
             font-size: 17px;
             color: var(--text-primary);
             font-family: inherit;
-            transition: all 0.15s ease-out;
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
             letter-spacing: -0.41px;
+            line-height: 1.47059;
         }
         
         .text-input:focus, .url-input:focus, .number-input:focus {
             outline: none;
             background: var(--fill-tertiary);
+            box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.3);
         }
         
         .text-input::placeholder, .url-input::placeholder, .number-input::placeholder {
@@ -294,9 +515,9 @@
         }
         
         textarea.text-input {
-            min-height: 88px;
+            min-height: 100px;
             resize: vertical;
-            line-height: 1.4;
+            line-height: 1.47059;
         }
         
         .price-field {
@@ -311,70 +532,140 @@
             transform: translateY(-50%);
             color: var(--text-secondary);
             font-size: 17px;
+            font-weight: 400;
             pointer-events: none;
             z-index: 1;
         }
         
         .price-field .number-input {
-            padding-left: 32px;
+            padding-left: 36px;
             text-align: right;
+            font-weight: 600;
         }
         
+        /* Buttons */
         .primary-button {
-            background: var(--ios-blue);
+            background: linear-gradient(135deg, var(--ios-blue), var(--ios-purple));
             color: white;
             border: none;
-            border-radius: 12px;
-            padding: 16px;
+            border-radius: var(--radius-large);
+            padding: 18px 24px;
             font-size: 17px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.15s ease-out;
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
             letter-spacing: -0.41px;
-            margin-top: 24px;
+            margin: 24px 0;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-medium);
+        }
+        
+        .primary-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transform: translateX(-100%);
+            transition: transform 0.6s;
+        }
+        
+        .primary-button:hover:not(:disabled)::before {
+            transform: translateX(100%);
         }
         
         .primary-button:hover:not(:disabled) {
-            background: var(--ios-blue-dark);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-large);
         }
         
-        .primary-button:active {
-            transform: scale(0.98);
+        .primary-button:active:not(:disabled) {
+            transform: translateY(0);
         }
         
         .primary-button:disabled {
             background: var(--fill-secondary);
             color: var(--text-tertiary);
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
         
-        .status-message {
-            padding: 12px 16px;
-            border-radius: 8px;
-            margin-top: 16px;
+        .close-button {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            width: 32px;
+            height: 32px;
+            border-radius: 16px;
+            background: var(--fill-tertiary);
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .close-button:hover {
+            background: var(--fill-secondary);
+        }
+        
+        .close-button::before {
+            content: '';
+            width: 16px;
+            height: 16px;
+            background: currentColor;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E") center/contain no-repeat;
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E") center/contain no-repeat;
+        }
+        
+        /* Status Messages */
+        .status-banner {
+            position: fixed;
+            top: calc(env(safe-area-inset-top) + 60px);
+            left: 16px;
+            right: 16px;
+            padding: 16px 20px;
+            border-radius: var(--radius-large);
             font-size: 15px;
-            font-weight: 400;
+            font-weight: 600;
             text-align: center;
             letter-spacing: -0.24px;
-            display: none;
+            backdrop-filter: saturate(180%) blur(20px);
+            border: 0.5px solid var(--separator-non-opaque);
+            transform: translateY(-100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+            z-index: 1001;
+            box-shadow: var(--shadow-large);
+        }
+        
+        .status-banner.show {
+            transform: translateY(0);
+            opacity: 1;
         }
         
         .status-success {
-            background: rgba(52, 199, 89, 0.15);
+            background: rgba(48, 209, 88, 0.15);
             color: var(--ios-green);
-            border: 0.5px solid rgba(52, 199, 89, 0.3);
+            border-color: rgba(48, 209, 88, 0.3);
         }
         
         .status-error {
-            background: rgba(255, 59, 48, 0.15);
+            background: rgba(255, 69, 58, 0.15);
             color: var(--ios-red);
-            border: 0.5px solid rgba(255, 59, 48, 0.3);
+            border-color: rgba(255, 69, 58, 0.3);
         }
         
         .status-loading {
             background: rgba(0, 122, 255, 0.15);
             color: var(--ios-blue);
-            border: 0.5px solid rgba(0, 122, 255, 0.3);
+            border-color: rgba(0, 122, 255, 0.3);
         }
         
         .loading-spinner {
@@ -392,93 +683,144 @@
             to { transform: rotate(360deg); }
         }
         
-        .settings-icon::before {
-            content: '';
-            width: 18px;
-            height: 18px;
-            background: currentColor;
-            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") center/contain no-repeat;
-            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2'%3E%3Ccircle cx='12' cy='12' r='3'%3E%3C/circle%3E%3Cpath d='M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1 1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z'%3E%3C/path%3E%3C/svg%3E") center/contain no-repeat;
+        /* Photo counter badge */
+        .photo-counter {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: var(--ios-red);
+            color: white;
+            border-radius: 12px;
+            min-width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(255, 69, 58, 0.3);
+            border: 2px solid var(--background-primary);
+        }
+        
+        /* Enhanced iOS animations */
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes scaleIn {
+            from {
+                transform: scale(0.9);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+        
+        .animate-slide-up {
+            animation: slideUp 0.3s cubic-bezier(0.2, 0, 0, 1);
+        }
+        
+        .animate-scale-in {
+            animation: scaleIn 0.2s cubic-bezier(0.2, 0, 0, 1);
         }
         
         /* iOS specific enhancements */
         @supports (-webkit-touch-callout: none) {
-            .container {
+            .app-container {
                 padding-top: max(16px, env(safe-area-inset-top));
-                padding-bottom: max(34px, env(safe-area-inset-bottom));
+                padding-bottom: max(24px, env(safe-area-inset-bottom));
             }
             
             .text-input, .url-input, .number-input, .primary-button {
                 -webkit-appearance: none;
             }
+            
+            .settings-content {
+                padding-bottom: calc(env(safe-area-inset-bottom) + 24px);
+            }
         }
         
         @media (max-width: 430px) {
-            .container {
+            .app-container {
                 padding-left: 12px;
                 padding-right: 12px;
             }
+            
+            .nav-large-title {
+                font-size: 28px;
+            }
+        }
+        
+        /* Haptic feedback simulation */
+        .haptic {
+            transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
+        }
+        
+        .haptic:active {
+            transform: scale(0.98);
         }
         
         /* Prevent zoom on double tap */
         .no-zoom {
             touch-action: manipulation;
         }
-        
-        /* Subtle accent for Pokemon theming */
-        .accent-gradient {
-            background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-blue) 100%);
-        }
     </style>
 </head>
 <body class="no-zoom">
-    <div class="container">
-        <div class="navigation-bar">
-            <h1 class="nav-title">Card Uploader</h1>
-            <button class="settings-button" onclick="toggleSettings()">
+    <div class="dynamic-island">
+        <div class="island-pill" id="dynamicIsland">
+            <div class="island-content" id="islandContent">
+                <span id="islandText">Ready</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container">
+        <div class="navigation-header">
+            <h1 class="nav-large-title">Card Uploader</h1>
+            <p class="nav-subtitle">Professional eBay listing tool</p>
+            <button class="settings-button haptic" onclick="toggleSettings()">
                 <span class="settings-icon"></span>
+                <div class="photo-counter" id="photoCounter" style="display: none;">0</div>
             </button>
         </div>
         
-        <div class="settings-card" id="settingsCard">
-            <div class="section-header">
-                <h2 class="section-title">Webhook Configuration</h2>
-            </div>
-            <div class="card">
-                <div class="card-row">
-                    <div class="form-field">
-                        <label class="field-label">N8N Webhook URL</label>
-                        <input type="url" id="webhookUrl" class="url-input" 
-                               placeholder="https://your-n8n-server.com/webhook/cards"
-                               value="https://labgrowns.nl/webhook-test/60406624-b200-493c-aaf3-23f068a09829">
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="section">
+        <div class="section-group upload-section">
             <div class="section-header">
                 <h2 class="section-title">Photos</h2>
             </div>
-            <div class="card">
-                <div class="upload-zone" onclick="document.getElementById('fileInput').click()" 
+            <div class="card card-elevated animate-slide-up">
+                <div class="upload-zone haptic" onclick="document.getElementById('fileInput').click()" 
                      ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
-                    <div class="upload-icon"></div>
+                    <div class="upload-icon-container">
+                        <div class="upload-icon"></div>
+                    </div>
                     <div class="upload-text">Add Photos</div>
                     <div class="upload-subtext">Tap to select or drag and drop</div>
                 </div>
                 
                 <input type="file" id="fileInput" accept="image/*" multiple capture="environment">
-                
-                <div id="previewContainer" class="preview-grid"></div>
+            </div>
+            
+            <div class="preview-section" id="previewSection" style="display: none;">
+                <div class="preview-grid" id="previewContainer"></div>
             </div>
         </div>
         
-        <div class="section">
+        <div class="section-group">
             <div class="section-header">
-                <h2 class="section-title">Details</h2>
+                <h2 class="section-title">Listing Details</h2>
             </div>
-            <div class="card">
+            <div class="card animate-slide-up">
                 <div class="card-row">
                     <div class="form-field">
                         <label class="field-label">Description</label>
@@ -498,11 +840,30 @@
             </div>
         </div>
         
-        <button class="primary-button accent-gradient" onclick="uploadCards()" id="uploadBtn">
+        <button class="primary-button haptic" onclick="uploadCards()" id="uploadBtn">
             Upload to eBay
         </button>
-        
-        <div id="statusMessage" class="status-message"></div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div class="settings-panel" id="settingsPanel" onclick="closeSettings(event)">
+        <div class="settings-content" onclick="event.stopPropagation()">
+            <div class="settings-handle"></div>
+            <button class="close-button" onclick="closeSettings()"></button>
+            <h2 class="settings-title">Webhook Settings</h2>
+            
+            <div class="form-field">
+                <label class="field-label">N8N Webhook URL</label>
+                <input type="url" id="webhookUrl" class="url-input" 
+                       placeholder="https://your-n8n-server.com/webhook/cards"
+                       value="https://labgrowns.nl/webhook-test/60406624-b200-493c-aaf3-23f068a09829">
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Banner -->
+    <div class="status-banner" id="statusBanner">
+        <span id="statusText">Ready</span>
     </div>
 
     <script>
@@ -516,31 +877,53 @@
             });
         }
         
-        // Load saved data
+        // Initialize app
         document.addEventListener('DOMContentLoaded', () => {
             const savedUrl = localStorage.getItem('webhookUrl');
             if (savedUrl) {
                 document.getElementById('webhookUrl').value = savedUrl;
             }
             updateUploadButton();
+            showDynamicIsland('Ready to upload', 'success');
         });
         
-        // Save webhook URL on change
+        // Save webhook URL
         document.getElementById('webhookUrl').addEventListener('change', (e) => {
             localStorage.setItem('webhookUrl', e.target.value);
+            showDynamicIsland('Settings saved', 'success');
         });
         
-        function toggleSettings() {
-            const settingsCard = document.getElementById('settingsCard');
-            settingsCard.classList.toggle('visible');
+        // Dynamic Island functions
+        function showDynamicIsland(text, type = 'info') {
+            const island = document.getElementById('dynamicIsland');
+            const content = document.getElementById('islandContent');
+            const textEl = document.getElementById('islandText');
+            
+            textEl.textContent = text;
+            island.classList.add('show');
+            
+            setTimeout(() => {
+                island.classList.remove('show');
+            }, 2000);
         }
         
-        // File input handler
+        // Settings functions
+        function toggleSettings() {
+            const panel = document.getElementById('settingsPanel');
+            panel.classList.add('visible');
+        }
+        
+        function closeSettings(event) {
+            if (event && event.target !== event.currentTarget) return;
+            const panel = document.getElementById('settingsPanel');
+            panel.classList.remove('visible');
+        }
+        
+        // File handling
         document.getElementById('fileInput').addEventListener('change', (e) => {
             handleFiles(e.target.files);
         });
         
-        // Drag and drop handlers
         function handleDragOver(e) {
             e.preventDefault();
             e.currentTarget.classList.add('dragover');
@@ -560,21 +943,20 @@
         async function handleFiles(files) {
             if (uploadInProgress) return;
             
-            showStatus('loading', 'Processing photos...');
+            showStatusBanner('Processing photos...', 'loading');
             
             const validFiles = Array.from(files).filter(file => {
                 if (!file.type.startsWith('image/')) {
-                    showStatus('error', `${file.name} is not a valid image`);
+                    showStatusBanner(`${file.name} is not a valid image`, 'error');
                     return false;
                 }
                 if (file.size > 50 * 1024 * 1024) {
-                    showStatus('error', `${file.name} is too large (max 50MB)`);
+                    showStatusBanner(`${file.name} is too large (max 50MB)`, 'error');
                     return false;
                 }
                 return true;
             });
             
-            // Compress each file
             const compressedFiles = [];
             for (const file of validFiles) {
                 try {
@@ -588,15 +970,13 @@
             
             selectedFiles = [...selectedFiles, ...compressedFiles];
             updatePreview();
+            updatePhotoCounter();
             
             if (compressedFiles.length > 0) {
                 const totalSize = compressedFiles.reduce((sum, file) => sum + file.size, 0);
                 const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(1);
-                showStatus('success', `${compressedFiles.length} photo${compressedFiles.length > 1 ? 's' : ''} added (${totalSizeMB}MB)`);
-                
-                setTimeout(() => {
-                    showStatus('', '');
-                }, 2000);
+                showStatusBanner(`${compressedFiles.length} photo${compressedFiles.length > 1 ? 's' : ''} added (${totalSizeMB}MB)`, 'success');
+                showDynamicIsland(`${selectedFiles.length} photos ready`, 'success');
             }
         }
         
@@ -640,18 +1020,19 @@
         
         function updatePreview() {
             const container = document.getElementById('previewContainer');
+            const section = document.getElementById('previewSection');
             
             if (selectedFiles.length === 0) {
-                container.style.display = 'none';
+                section.style.display = 'none';
                 return;
             }
             
-            container.style.display = 'grid';
+            section.style.display = 'block';
             container.innerHTML = '';
             
             selectedFiles.forEach((file, index) => {
                 const previewDiv = document.createElement('div');
-                previewDiv.className = 'preview-item';
+                previewDiv.className = 'preview-item animate-scale-in';
                 
                 const img = document.createElement('img');
                 img.className = 'preview-image';
@@ -659,7 +1040,7 @@
                 img.alt = `Preview ${index + 1}`;
                 
                 const removeBtn = document.createElement('button');
-                removeBtn.className = 'remove-button';
+                removeBtn.className = 'remove-button haptic';
                 removeBtn.onclick = (e) => {
                     e.stopPropagation();
                     removeFile(index);
@@ -676,9 +1057,22 @@
         function removeFile(index) {
             selectedFiles.splice(index, 1);
             updatePreview();
+            updatePhotoCounter();
             
             if (selectedFiles.length === 0) {
-                showStatus('', '');
+                showDynamicIsland('Ready to upload', 'info');
+            } else {
+                showDynamicIsland(`${selectedFiles.length} photos ready`, 'success');
+            }
+        }
+        
+        function updatePhotoCounter() {
+            const counter = document.getElementById('photoCounter');
+            if (selectedFiles.length > 0) {
+                counter.textContent = selectedFiles.length;
+                counter.style.display = 'flex';
+            } else {
+                counter.style.display = 'none';
             }
         }
         
@@ -695,7 +1089,6 @@
             }
         }
         
-        // Update button state when inputs change
         document.getElementById('webhookUrl').addEventListener('input', updateUploadButton);
         
         async function uploadCards() {
@@ -706,33 +1099,32 @@
             const price = document.getElementById('price').value;
             
             if (selectedFiles.length === 0) {
-                showStatus('error', 'Please select one or more photos first');
+                showStatusBanner('Please select one or more photos first', 'error');
                 return;
             }
             
             if (!webhookUrl) {
-                showStatus('error', 'Please enter your N8N webhook URL first');
+                showStatusBanner('Please enter your N8N webhook URL first', 'error');
                 return;
             }
             
             if (!isValidUrl(webhookUrl)) {
-                showStatus('error', 'Please enter a valid webhook URL');
+                showStatusBanner('Please enter a valid webhook URL', 'error');
                 return;
             }
             
             uploadInProgress = true;
             updateUploadButton();
-            showStatus('loading', 'Uploading to eBay...');
+            showStatusBanner('Uploading to eBay...', 'loading');
+            showDynamicIsland('Uploading...', 'loading');
             
             try {
                 const formData = new FormData();
                 
-                // Add all files
                 selectedFiles.forEach((file, index) => {
                     formData.append(`image_${index}`, file);
                 });
                 
-                // Add metadata
                 formData.append('description', description);
                 formData.append('price', price || '0');
                 formData.append('timestamp', new Date().toISOString());
@@ -747,9 +1139,10 @@
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
                 
-                const result = await response.json().catch(() => ({}));
+                await response.json().catch(() => ({}));
                 
-                showStatus('success', `${selectedFiles.length} photo${selectedFiles.length > 1 ? 's' : ''} successfully uploaded to eBay!`);
+                showStatusBanner(`${selectedFiles.length} photo${selectedFiles.length > 1 ? 's' : ''} successfully uploaded to eBay!`, 'success');
+                showDynamicIsland('Upload complete!', 'success');
                 
                 // Reset form
                 selectedFiles = [];
@@ -757,38 +1150,37 @@
                 document.getElementById('price').value = '';
                 document.getElementById('fileInput').value = '';
                 updatePreview();
-                
-                // Auto-hide success message
-                setTimeout(() => {
-                    showStatus('', '');
-                }, 3000);
+                updatePhotoCounter();
                 
             } catch (error) {
                 console.error('Upload error:', error);
-                showStatus('error', `Upload failed: ${error.message}`);
+                showStatusBanner(`Upload failed: ${error.message}`, 'error');
+                showDynamicIsland('Upload failed', 'error');
             } finally {
                 uploadInProgress = false;
                 updateUploadButton();
             }
         }
         
-        function showStatus(type, message) {
-            const statusEl = document.getElementById('statusMessage');
+        function showStatusBanner(message, type) {
+            const banner = document.getElementById('statusBanner');
+            const text = document.getElementById('statusText');
             
-            if (!message) {
-                statusEl.style.display = 'none';
-                return;
-            }
-            
-            statusEl.className = `status-message status-${type}`;
+            banner.className = `status-banner status-${type}`;
             
             if (type === 'loading') {
-                statusEl.innerHTML = `<span class="loading-spinner"></span>${message}`;
+                text.innerHTML = `<span class="loading-spinner"></span>${message}`;
             } else {
-                statusEl.textContent = message;
+                text.textContent = message;
             }
             
-            statusEl.style.display = 'block';
+            banner.classList.add('show');
+            
+            if (type !== 'loading') {
+                setTimeout(() => {
+                    banner.classList.remove('show');
+                }, 3000);
+            }
         }
         
         function isValidUrl(string) {
@@ -820,7 +1212,7 @@
         window.addEventListener('orientationchange', updateViewport);
         updateViewport();
         
-        // PWA Install prompt
+        // PWA Install
         let deferredPrompt;
         
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -837,12 +1229,12 @@
         function showInstallPrompt() {
             const installBtn = document.createElement('button');
             installBtn.className = 'primary-button';
-            installBtn.style.background = 'var(--ios-purple)';
+            installBtn.style.background = 'linear-gradient(135deg, var(--ios-purple), var(--ios-pink))';
             installBtn.style.marginTop = '16px';
             installBtn.textContent = 'Install App';
             installBtn.onclick = installApp;
             
-            document.querySelector('.container').appendChild(installBtn);
+            document.querySelector('.app-container').appendChild(installBtn);
         }
         
         async function installApp() {
@@ -852,12 +1244,26 @@
             const result = await deferredPrompt.userChoice;
             
             if (result.outcome === 'accepted') {
-                showStatus('success', 'App is being installed...');
+                showStatusBanner('App is being installed...', 'success');
+                showDynamicIsland('Installing app...', 'success');
             }
             
             deferredPrompt = null;
             event.target.remove();
         }
+        
+        // Add haptic feedback simulation
+        document.addEventListener('touchstart', function(e) {
+            if (e.target.classList.contains('haptic')) {
+                e.target.style.transform = 'scale(0.98)';
+            }
+        });
+        
+        document.addEventListener('touchend', function(e) {
+            if (e.target.classList.contains('haptic')) {
+                e.target.style.transform = '';
+            }
+        });
     </script>
 </body>
 </html>
