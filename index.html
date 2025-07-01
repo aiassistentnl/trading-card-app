@@ -1,475 +1,42 @@
-<div class="form-field" style="margin-top: 20px;">
-                <label class="field-label">
-                    <span>Auto Price Check eerste foto</span>
-                    <input type="checkbox" id="autoPriceCheckEnabled" checked style="margin-left: 10px;">
-                </label>
-                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
-                    Stuurt eerste foto automatisch naar price check workflow
-                </div>
-                
-                <div style="margin-top: 12px;">
-                    <button class="primary-button" onclick="testPriceCheckWebhook()" id="testPriceCheckBtn" style="margin: 0; padding: 12px 20px; font-size: 15px;">
-                        Test Price Check
-                    </button>
-                </div>
-            </div><!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Card Uploader Pro</title>
+    <title>Card Uploader</title>
     <meta name="theme-color" content="#007AFF">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Card Uploader Pro">
     
     <style>
         :root {
             --ios-blue: #007AFF;
-            --ios-blue-dark: #0051D0;
             --ios-green: #30D158;
             --ios-red: #FF453A;
             --ios-orange: #FF9F0A;
-            --ios-purple: #BF5AF2;
-            --ios-pink: #FF2D92;
-            --ios-teal: #40C8E0;
-            --ios-yellow: #FFD60A;
             
             --background-primary: #000000;
             --background-secondary: #1C1C1E;
             --background-tertiary: #2C2C2E;
-            --background-quaternary: #3A3A3C;
             
             --surface-primary: rgba(28, 28, 30, 0.8);
-            --surface-secondary: rgba(44, 44, 46, 0.8);
-            --surface-tertiary: rgba(58, 58, 60, 0.8);
             --surface-elevated: rgba(44, 44, 46, 0.95);
             
             --text-primary: #FFFFFF;
             --text-secondary: rgba(235, 235, 245, 0.6);
             --text-tertiary: rgba(235, 235, 245, 0.3);
-            --text-quaternary: rgba(235, 235, 245, 0.18);
             
-            --fill-primary: rgba(120, 120, 128, 0.2);
             --fill-secondary: rgba(120, 120, 128, 0.16);
             --fill-tertiary: rgba(118, 118, 128, 0.12);
-            --fill-quaternary: rgba(118, 118, 128, 0.08);
             
-            --separator-opaque: #38383A;
             --separator-non-opaque: rgba(84, 84, 88, 0.6);
             
-            --label-primary: rgba(255, 255, 255, 1);
-            --label-secondary: rgba(235, 235, 245, 0.6);
-            --label-tertiary: rgba(235, 235, 245, 0.3);
-            
-            --system-gray: #8E8E93;
-            --system-gray2: #636366;
-            --system-gray3: #48484A;
-            --system-gray4: #3A3A3C;
-            --system-gray5: #2C2C2E;
-            --system-gray6: #1C1C1E;
-            
-            --radius-small: 8px;
             --radius-medium: 12px;
             --radius-large: 16px;
             --radius-xl: 24px;
             
-            --shadow-small: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
             --shadow-medium: 0 4px 6px rgba(0, 0, 0, 0.16), 0 2px 4px rgba(0, 0, 0, 0.06);
             --shadow-large: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
-            --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15), 0 10px 10px rgba(0, 0, 0, 0.04);
-        }
-        
-        // Manual price check function
-        async function manualPriceCheck(fileIndex) {
-            if (fileIndex >= selectedFiles.length) return;
-            
-            const file = selectedFiles[fileIndex];
-            await performAutoPriceCheck(file);
-        }
-        
-        // Manual crop modal
-        function openCropModal(file, index) {
-            // For now, show a simple alert - you can expand this to a full crop interface
-            if (confirm('Wil je deze foto handmatig bijsnijden? (Tip: Gebruik auto-crop in instellingen voor automatisch bijsnijden)')) {
-                // Here you could implement a manual crop interface
-                showStatusBanner('Handmatige crop tool komt binnenkort!', 'info');
-            }
-        }
-        
-        // Price checking functions
-        async function performAutoPriceCheck(file) {
-            const priceCheckUrl = document.getElementById('priceCheckUrl').value.trim();
-            
-            if (!priceCheckUrl || !isValidUrl(priceCheckUrl)) {
-                return;
-            }
-            
-            try {
-                showDynamicIsland('Price check wordt uitgevoerd...', 'loading');
-                
-                const formData = new FormData();
-                formData.append('image', file);
-                formData.append('filename', file.name);
-                formData.append('timestamp', new Date().toISOString());
-                formData.append('action', 'pricecheck');
-                
-                const response = await fetch(priceCheckUrl, {
-                    method: 'POST',
-                    body: formData,
-                });
-                
-                if (response.ok) {
-                    showDynamicIsland('Price check succesvol verstuurd!', 'success');
-                    showStatusBanner('Price check geopend op je computer', 'success');
-                } else {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                
-            } catch (error) {
-                console.error('Price check error:', error);
-                showDynamicIsland('Price check mislukt', 'error');
-            }
-        }
-        
-        // Auto-crop functions
-        async function autoCropCard(file, onProgress = () => {}) {
-            return new Promise((resolve) => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                const img = new Image();
-                
-                img.onload = function() {
-                    onProgress(0.2);
-                    
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
-                    
-                    onProgress(0.4);
-                    
-                    // Simple edge detection and crop
-                    const cropRect = detectCardBounds(ctx, img.width, img.height);
-                    
-                    onProgress(0.7);
-                    
-                    if (cropRect) {
-                        // Create new canvas with cropped dimensions
-                        const croppedCanvas = document.createElement('canvas');
-                        const croppedCtx = croppedCanvas.getContext('2d');
-                        
-                        croppedCanvas.width = cropRect.width;
-                        croppedCanvas.height = cropRect.height;
-                        
-                        croppedCtx.drawImage(
-                            img,
-                            cropRect.x, cropRect.y, cropRect.width, cropRect.height,
-                            0, 0, cropRect.width, cropRect.height
-                        );
-                        
-                        onProgress(0.9);
-                        
-                        croppedCanvas.toBlob((blob) => {
-                            const croppedFile = new File([blob], file.name, {
-                                type: 'image/jpeg',
-                                lastModified: Date.now()
-                            });
-                            onProgress(1.0);
-                            resolve(croppedFile);
-                        }, 'image/jpeg', 0.95);
-                    } else {
-                        // No card detected, return original
-                        onProgress(1.0);
-                        resolve(file);
-                    }
-                };
-                
-                img.src = URL.createObjectURL(file);
-            });
-        }
-        
-        function detectCardBounds(ctx, width, height) {
-            try {
-                const imageData = ctx.getImageData(0, 0, width, height);
-                const data = imageData.data;
-                
-                // Convert to grayscale and find edges
-                const gray = new Array(width * height);
-                for (let i = 0; i < data.length; i += 4) {
-                    const grayValue = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-                    gray[i / 4] = grayValue;
-                }
-                
-                // Simple edge detection (looking for card boundaries)
-                let minX = width, maxX = 0, minY = height, maxY = 0;
-                let foundEdges = false;
-                
-                const threshold = 30; // Edge detection threshold
-                
-                // Scan for vertical edges
-                for (let y = 0; y < height; y++) {
-                    for (let x = 1; x < width - 1; x++) {
-                        const current = gray[y * width + x];
-                        const prev = gray[y * width + (x - 1)];
-                        const next = gray[y * width + (x + 1)];
-                        
-                        if (Math.abs(current - prev) > threshold || Math.abs(current - next) > threshold) {
-                            minX = Math.min(minX, x);
-                            maxX = Math.max(maxX, x);
-                            minY = Math.min(minY, y);
-                            maxY = Math.max(maxY, y);
-                            foundEdges = true;
-                        }
-                    }
-                }
-                
-                // Scan for horizontal edges
-                for (let x = 0; x < width; x++) {
-                    for (let y = 1; y < height - 1; y++) {
-                        const current = gray[y * width + x];
-                        const prev = gray[(y - 1) * width + x];
-                        const next = gray[(y + 1) * width + x];
-                        
-                        if (Math.abs(current - prev) > threshold || Math.abs(current - next) > threshold) {
-                            minX = Math.min(minX, x);
-                            maxX = Math.max(maxX, x);
-                            minY = Math.min(minY, y);
-                            maxY = Math.max(maxY, y);
-                            foundEdges = true;
-                        }
-                    }
-                }
-                
-                if (!foundEdges) return null;
-                
-                // Add some padding and ensure reasonable dimensions
-                const padding = Math.min(width, height) * 0.05; // 5% padding
-                minX = Math.max(0, minX - padding);
-                minY = Math.max(0, minY - padding);
-                maxX = Math.min(width, maxX + padding);
-                maxY = Math.min(height, maxY + padding);
-                
-                const cropWidth = maxX - minX;
-                const cropHeight = maxY - minY;
-                
-                // Ensure minimum size and reasonable aspect ratio
-                if (cropWidth < width * 0.3 || cropHeight < height * 0.3) {
-                    return null; // Too small, probably not a card
-                }
-                
-                const aspectRatio = cropWidth / cropHeight;
-                if (aspectRatio < 0.5 || aspectRatio > 2.0) {
-                    return null; // Unreasonable aspect ratio for a card
-                }
-                
-                return {
-                    x: Math.round(minX),
-                    y: Math.round(minY),
-                    width: Math.round(cropWidth),
-                    height: Math.round(cropHeight)
-                };
-                
-            } catch (error) {
-                console.warn('Auto-crop failed:', error);
-                return null;
-            }
-        }
-        
-        // Camera optimization functions
-        let cameraStream = null;
-        let cameraModal = null;
-        
-        async function openOptimizedCamera() {
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                showStatusBanner('Camera niet beschikbaar op dit apparaat', 'error');
-                return;
-            }
-            
-            try {
-                const constraints = {
-                    video: {
-                        facingMode: 'environment', // Rear camera
-                        focusMode: 'continuous', // Continuous autofocus
-                        width: { ideal: 1920 },
-                        height: { ideal: 1080 }
-                    }
-                };
-                
-                // Add camera optimization constraints if enabled
-                if (document.getElementById('cameraOptimizationEnabled').checked) {
-                    constraints.video.focusDistance = { ideal: 0.3 }; // Focus on close objects but not macro
-                    constraints.video.zoom = { ideal: 1.0 }; // No zoom
-                    constraints.video.torch = false; // No flash initially
-                }
-                
-                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
-                showCameraInterface(cameraStream);
-                
-            } catch (error) {
-                console.error('Camera error:', error);
-                showStatusBanner('Camera kon niet worden geopend', 'error');
-                // Fallback to file input
-                document.getElementById('fileInput').click();
-            }
-        }
-        
-        async function takeQuickPhoto() {
-            // Quick single photo without persistent camera
-            document.getElementById('fileInput').click();
-        }
-        
-        function showCameraInterface(stream) {
-            // Create camera modal
-            cameraModal = document.createElement('div');
-            cameraModal.className = 'modal-overlay visible';
-            cameraModal.innerHTML = `
-                <div class="modal-content" style="max-width: 100vw; max-height: 100vh; width: 100%; height: 100%;">
-                    <div class="modal-header">
-                        <div class="modal-title">Continue Shooting</div>
-                        <div style="display: flex; gap: 8px;">
-                            <span class="photo-count-badge" id="photoCountBadge">${selectedFiles.length} foto's</span>
-                            <button class="close-button" onclick="closeCameraInterface()"></button>
-                        </div>
-                    </div>
-                    <div class="modal-body" style="padding: 0; height: calc(100% - 80px); display: flex; flex-direction: column;">
-                        <video id="cameraVideo" autoplay playsinline style="width: 100%; flex: 1; object-fit: cover; background: black;"></video>
-                        <div class="camera-controls">
-                            <button class="capture-button" onclick="capturePhoto()">
-                                <div class="capture-ring">
-                                    <div class="capture-inner"></div>
-                                </div>
-                            </button>
-                            <div class="camera-info">
-                                <div>Tap om foto te maken</div>
-                                <div style="font-size: 12px; opacity: 0.7;">Auto-crop en price check actief</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(cameraModal);
-            
-            const video = cameraModal.querySelector('#cameraVideo');
-            video.srcObject = stream;
-        }
-        
-        function capturePhoto() {
-            const video = document.getElementById('cameraVideo');
-            if (!video) return;
-            
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            
-            canvas.toBlob((blob) => {
-                const file = new File([blob], `card_${Date.now()}.jpg`, {
-                    type: 'image/jpeg',
-                    lastModified: Date.now()
-                });
-                
-                handleFiles([file]);
-                
-                // Update photo count in camera interface
-                updateCameraPhotoCount();
-                
-                // Show capture feedback
-                showCaptureAnimation();
-                
-            }, 'image/jpeg', 0.95);
-        }
-        
-        function updateCameraPhotoCount() {
-            const badge = document.getElementById('photoCountBadge');
-            if (badge) {
-                badge.textContent = `${selectedFiles.length} foto's`;
-            }
-        }
-        
-        function showCaptureAnimation() {
-            const video = document.getElementById('cameraVideo');
-            if (video) {
-                video.style.filter = 'brightness(1.5)';
-                setTimeout(() => {
-                    video.style.filter = 'none';
-                }, 150);
-            }
-            
-            // Haptic feedback simulation
-            if (navigator.vibrate) {
-                navigator.vibrate(50);
-            }
-        }
-        
-        function closeCameraInterface() {
-            if (cameraModal) {
-                // Stop camera stream
-                if (cameraStream) {
-                    cameraStream.getTracks().forEach(track => track.stop());
-                    cameraStream = null;
-                }
-                cameraModal.remove();
-                cameraModal = null;
-            }
-        }
-        
-        // Update file input based on camera optimization setting
-        function updateCameraInput() {
-            const fileInput = document.getElementById('fileInput');
-            const cameraButton = document.querySelector('.camera-button');
-            const optimizationEnabled = document.getElementById('cameraOptimizationEnabled').checked;
-            
-            if (optimizationEnabled && navigator.mediaDevices) {
-                // Show optimized camera button
-                cameraButton.style.display = 'block';
-                fileInput.setAttribute('capture', 'environment');
-            } else {
-                // Hide optimized camera button
-                cameraButton.style.display = 'none';
-                fileInput.setAttribute('capture', 'environment');
-            }
-        }
-        
-        // Test price check webhook
-        async function testPriceCheckWebhook() {
-            const priceCheckUrl = document.getElementById('priceCheckUrl').value.trim();
-            
-            if (!priceCheckUrl) {
-                showStatusBanner('Voer eerst een Price Check URL in', 'error');
-                return;
-            }
-            
-            if (!isValidUrl(priceCheckUrl)) {
-                showStatusBanner('Ongeldige Price Check URL', 'error');
-                return;
-            }
-            
-            try {
-                showStatusBanner('Price Check webhook testen...', 'loading');
-                
-                const formData = new FormData();
-                formData.append('test', 'true');
-                formData.append('message', 'Test vanuit Card Uploader Pro');
-                formData.append('timestamp', new Date().toISOString());
-                
-                const response = await fetch(priceCheckUrl, {
-                    method: 'POST',
-                    body: formData,
-                });
-                
-                if (response.ok) {
-                    showStatusBanner('Price Check webhook werkt perfect!', 'success');
-                } else {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                
-            } catch (error) {
-                console.error('Price check test error:', error);
-                showStatusBanner(`Webhook test mislukt: ${error.message}`, 'error');
-            }
         }
         
         * {
@@ -485,12 +52,9 @@
             color: var(--text-primary);
             min-height: 100vh;
             padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-            overflow-x: hidden;
-            line-height: 1.47059;
             -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-            font-synthesis: none;
-            text-rendering: optimizeLegibility;
+            line-height: 1.47059;
+            touch-action: manipulation;
         }
         
         .app-container {
@@ -498,53 +62,12 @@
             margin: 0 auto;
             padding: 0 16px;
             min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-        }
-        
-        /* Dynamic Island */
-        .dynamic-island {
-            position: fixed;
-            top: calc(env(safe-area-inset-top) + 14px);
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            pointer-events: none;
-        }
-        
-        .island-pill {
-            background: var(--background-secondary);
-            border-radius: 20px;
-            padding: 8px 16px;
-            backdrop-filter: blur(20px);
-            border: 0.5px solid var(--separator-non-opaque);
-            opacity: 0;
-            transform: scale(0.8);
-            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
-            box-shadow: var(--shadow-large);
-            max-width: 280px;
-        }
-        
-        .island-pill.show {
-            opacity: 1;
-            transform: scale(1);
-        }
-        
-        .island-content {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 14px;
-            font-weight: 600;
-            color: var(--text-primary);
         }
         
         /* Navigation */
         .navigation-header {
             padding: 17px 0 11px;
             position: relative;
-            z-index: 100;
         }
         
         .nav-large-title {
@@ -563,15 +86,10 @@
             letter-spacing: -0.41px;
         }
         
-        .nav-actions {
+        .settings-button {
             position: absolute;
             top: 17px;
             right: 0;
-            display: flex;
-            gap: 8px;
-        }
-        
-        .action-button {
             width: 44px;
             height: 44px;
             background: var(--fill-tertiary);
@@ -579,43 +97,23 @@
             border-radius: 22px;
             color: var(--ios-blue);
             cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
-            backdrop-filter: blur(20px);
+            transition: all 0.2s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            position: relative;
         }
         
-        .action-button:hover {
+        .settings-button:hover {
             background: var(--fill-secondary);
             transform: scale(1.05);
         }
         
-        .action-button:active {
-            transform: scale(0.95);
-        }
-        
-        .action-icon {
+        .settings-icon {
             width: 18px;
             height: 18px;
             background: currentColor;
-            mask-size: contain;
-            mask-repeat: no-repeat;
-            mask-position: center;
-            -webkit-mask-size: contain;
-            -webkit-mask-repeat: no-repeat;
-            -webkit-mask-position: center;
-        }
-        
-        .icon-settings {
-            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E");
-            -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E");
-        }
-        
-        .icon-templates {
-            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'/%3E%3C/svg%3E");
-            -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'/%3E%3C/svg%3E");
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E") center/contain no-repeat;
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E") center/contain no-repeat;
         }
         
         .photo-counter {
@@ -627,12 +125,11 @@
             border-radius: 12px;
             min-width: 24px;
             height: 24px;
-            display: flex;
+            display: none;
             align-items: center;
             justify-content: center;
             font-size: 12px;
             font-weight: 600;
-            box-shadow: 0 2px 8px rgba(255, 69, 58, 0.3);
             border: 2px solid var(--background-primary);
         }
         
@@ -655,29 +152,9 @@
             color: var(--text-secondary);
             text-transform: uppercase;
             letter-spacing: -0.08px;
-            line-height: 1.3;
-            display: flex;
-            align-items: center;
-            gap: 12px;
         }
         
-        .price-check-status {
-            font-size: 11px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: none;
-            background: var(--fill-tertiary);
-            padding: 2px 8px;
-            border-radius: 12px;
-            border: 1px solid var(--separator-non-opaque);
-        }
-        
-        .section-actions {
-            display: flex;
-            gap: 8px;
-        }
-        
-        .mini-button {
+        .clear-button {
             padding: 4px 8px;
             background: var(--fill-tertiary);
             border: none;
@@ -689,11 +166,11 @@
             transition: all 0.2s ease;
         }
         
-        .mini-button:hover {
+        .clear-button:hover {
             background: var(--fill-secondary);
         }
         
-        .mini-button:disabled {
+        .clear-button:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
@@ -705,18 +182,6 @@
             backdrop-filter: saturate(180%) blur(20px);
             border: 0.5px solid var(--separator-non-opaque);
             overflow: hidden;
-            position: relative;
-        }
-        
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 0.5px;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-            opacity: 0.6;
         }
         
         .card-elevated {
@@ -727,80 +192,47 @@
         .card-row {
             padding: 16px;
             border-bottom: 0.5px solid var(--separator-non-opaque);
-            transition: background-color 0.15s ease-out;
         }
         
         .card-row:last-child {
             border-bottom: none;
         }
         
-        .card-row:active {
-            background: var(--fill-quaternary);
-        }
-        
         /* Upload Zone */
-        .upload-section {
-            margin-bottom: 24px;
-        }
-        
         .upload-zone {
             padding: 48px 24px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            transition: all 0.2s ease;
             position: relative;
-            background: var(--surface-secondary);
+            background: var(--fill-secondary);
             border: 2px dashed var(--separator-non-opaque);
             border-radius: var(--radius-large);
             margin: 16px;
-            overflow: hidden;
-        }
-        
-        .upload-zone::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, rgba(0, 122, 255, 0.05), rgba(191, 90, 242, 0.05));
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .upload-zone:hover::before {
-            opacity: 1;
         }
         
         .upload-zone:hover {
-            background: var(--surface-tertiary);
+            background: var(--fill-tertiary);
             border-color: var(--ios-blue);
             transform: translateY(-2px);
-            box-shadow: var(--shadow-medium);
         }
         
         .upload-zone.dragover {
             background: rgba(0, 122, 255, 0.1);
             border-color: var(--ios-blue);
             transform: scale(1.02);
-            box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.2);
-        }
-        
-        .upload-zone.dragover::before {
-            opacity: 1;
         }
         
         .upload-icon-container {
             width: 80px;
             height: 80px;
             margin: 0 auto 20px;
-            background: linear-gradient(135deg, var(--ios-blue), var(--ios-purple));
+            background: linear-gradient(135deg, var(--ios-blue), rgba(191, 90, 242, 1));
             border-radius: 40px;
             display: flex;
             align-items: center;
             justify-content: center;
             position: relative;
-            box-shadow: var(--shadow-medium);
         }
         
         .upload-icon-container::before {
@@ -810,7 +242,7 @@
             left: 2px;
             right: 2px;
             bottom: 2px;
-            background: var(--surface-secondary);
+            background: var(--fill-secondary);
             border-radius: 38px;
         }
         
@@ -842,9 +274,16 @@
             display: none;
         }
         
+        .file-picker-button {
+            margin: 16px;
+            border-top: 0.5px solid var(--separator-non-opaque);
+            padding-top: 16px;
+        }
+        
         /* Preview Grid */
         .preview-section {
             margin: 0 16px 16px;
+            display: none;
         }
         
         .preview-grid {
@@ -859,47 +298,19 @@
             border-radius: var(--radius-medium);
             overflow: hidden;
             background: var(--fill-secondary);
-            box-shadow: var(--shadow-small);
-            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            box-shadow: var(--shadow-medium);
+            transition: all 0.2s ease;
             cursor: pointer;
         }
         
         .preview-item:hover {
             transform: scale(1.05);
-            box-shadow: var(--shadow-medium);
-        }
-        
-        .preview-item.selected {
-            box-shadow: 0 0 0 3px var(--ios-blue);
-        }
-        
-        .preview-item.dragging {
-            opacity: 0.5;
-            transform: scale(1.1) rotate(5deg);
         }
         
         .preview-image {
             width: 100%;
             height: 100%;
             object-fit: cover;
-        }
-        
-        .preview-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.3);
-            opacity: 0;
-            transition: opacity 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .preview-item:hover .preview-overlay {
-            opacity: 1;
         }
         
         .preview-info {
@@ -929,7 +340,7 @@
             align-items: center;
             justify-content: center;
             backdrop-filter: blur(10px);
-            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            transition: all 0.2s ease;
             opacity: 0;
         }
         
@@ -951,9 +362,9 @@
             -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E") center/contain no-repeat;
         }
         
-        .reorder-handle {
+        .price-check-button {
             position: absolute;
-            top: 6px;
+            bottom: 6px;
             left: 6px;
             width: 24px;
             height: 24px;
@@ -961,51 +372,13 @@
             background: rgba(0, 0, 0, 0.8);
             border: none;
             color: white;
-            cursor: grab;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(10px);
-            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
-            opacity: 0;
-        }
-        
-        .preview-item:hover .reorder-handle {
-            opacity: 1;
-        }
-        
-        .reorder-handle:active {
-            cursor: grabbing;
-        }
-        
-        .reorder-handle::before {
-            content: '';
-            width: 12px;
-            height: 12px;
-            background: currentColor;
-            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 8h16M4 16h16'/%3E%3C/svg%3E") center/contain no-repeat;
-            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 8h16M4 16h16'/%3E%3C/svg%3E") center/contain no-repeat;
-        }
-        
-        .price-check-button {
-            position: absolute;
-            bottom: 6px;
-            right: 6px;
-            width: 28px;
-            height: 28px;
-            border-radius: 14px;
-            background: rgba(255, 215, 10, 0.9);
-            border: none;
-            color: #000;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             backdrop-filter: blur(10px);
-            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            transition: all 0.2s ease;
             opacity: 0;
-            font-size: 14px;
-            font-weight: bold;
         }
         
         .preview-item:hover .price-check-button {
@@ -1013,113 +386,23 @@
         }
         
         .price-check-button:hover {
-            background: var(--ios-yellow);
-            transform: scale(1.1);
-        }
-        
-        .crop-button {
-            position: absolute;
-            bottom: 6px;
-            left: 6px;
-            width: 28px;
-            height: 28px;
-            border-radius: 14px;
-            background: rgba(0, 122, 255, 0.9);
-            border: none;
-            color: white;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(10px);
-            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
-            opacity: 0;
-            font-size: 14px;
-            font-weight: bold;
-        }
-        
-        .preview-item:hover .crop-button {
-            opacity: 1;
-        }
-        
-        .crop-button:hover {
             background: var(--ios-blue);
             transform: scale(1.1);
         }
         
-        /* Progress bars */
-        .progress-container {
-            margin: 16px;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        
-        .progress-container.show {
-            opacity: 1;
-        }
-        
-        .progress-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 0;
-            border-bottom: 0.5px solid var(--separator-non-opaque);
-        }
-        
-        .progress-item:last-child {
-            border-bottom: none;
-        }
-        
-        .progress-thumb {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            object-fit: cover;
-            background: var(--fill-secondary);
-        }
-        
-        .progress-info {
-            flex: 1;
-            min-width: 0;
-        }
-        
-        .progress-name {
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--text-primary);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 4px;
-            background: var(--fill-secondary);
-            border-radius: 2px;
-            overflow: hidden;
-            margin-top: 4px;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--ios-blue), var(--ios-purple));
-            border-radius: 2px;
-            transition: width 0.3s ease;
-            width: 0%;
-        }
-        
-        .progress-status {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-top: 2px;
+        .price-check-button::before {
+            content: '';
+            width: 12px;
+            height: 12px;
+            background: currentColor;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1'/%3E%3C/svg%3E") center/contain no-repeat;
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1'/%3E%3C/svg%3E") center/contain no-repeat;
         }
         
         /* Form Fields */
         .form-field {
             display: flex;
             flex-direction: column;
-            position: relative;
         }
         
         .field-label {
@@ -1128,23 +411,6 @@
             color: var(--text-primary);
             margin-bottom: 8px;
             letter-spacing: -0.41px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .field-actions {
-            display: flex;
-            gap: 8px;
-        }
-        
-        .template-button {
-            font-size: 13px;
-            color: var(--ios-blue);
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 0;
         }
         
         .text-input, .url-input, .number-input {
@@ -1155,9 +421,8 @@
             font-size: 17px;
             color: var(--text-primary);
             font-family: inherit;
-            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            transition: all 0.2s ease;
             letter-spacing: -0.41px;
-            line-height: 1.47059;
         }
         
         .text-input:focus, .url-input:focus, .number-input:focus {
@@ -1173,18 +438,6 @@
         textarea.text-input {
             min-height: 100px;
             resize: vertical;
-            line-height: 1.47059;
-        }
-        
-        .character-counter {
-            position: absolute;
-            bottom: 8px;
-            right: 12px;
-            font-size: 12px;
-            color: var(--text-tertiary);
-            background: var(--background-secondary);
-            padding: 2px 6px;
-            border-radius: 4px;
         }
         
         .price-field {
@@ -1199,7 +452,6 @@
             transform: translateY(-50%);
             color: var(--text-secondary);
             font-size: 17px;
-            font-weight: 400;
             pointer-events: none;
             z-index: 1;
         }
@@ -1210,72 +462,20 @@
             font-weight: 600;
         }
         
-        /* Camera interface styles */
-        .photo-count-badge {
-            background: var(--fill-tertiary);
-            color: var(--text-primary);
-            padding: 4px 12px;
-            border-radius: 16px;
-            font-size: 14px;
-            font-weight: 600;
-            border: 0.5px solid var(--separator-non-opaque);
-        }
-        
-        .camera-controls {
-            padding: 30px 20px calc(env(safe-area-inset-bottom) + 20px);
-            background: rgba(0, 0, 0, 0.9);
-            backdrop-filter: blur(20px);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 16px;
-        }
-        
-        .capture-button {
-            background: none;
-            border: none;
-            cursor: pointer;
-            padding: 0;
-            transition: transform 0.1s ease;
-        }
-        
-        .capture-button:active {
-            transform: scale(0.95);
-        }
-        
-        .capture-ring {
-            width: 80px;
-            height: 80px;
-            border: 4px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(255, 255, 255, 0.1);
-        }
-        
-        .capture-inner {
-            width: 60px;
-            height: 60px;
-            background: white;
-            border-radius: 50%;
-            transition: all 0.1s ease;
-        }
-        
-        .capture-button:active .capture-inner {
-            transform: scale(0.9);
-        }
-        
-        .camera-info {
-            text-align: center;
-            color: white;
-            font-size: 14px;
-            font-weight: 500;
+        .character-counter {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 12px;
+            color: var(--text-tertiary);
+            background: var(--background-secondary);
+            padding: 2px 6px;
+            border-radius: 4px;
         }
         
         /* Buttons */
         .primary-button {
-            background: linear-gradient(135deg, var(--ios-blue), var(--ios-purple));
+            background: linear-gradient(135deg, var(--ios-blue), rgba(191, 90, 242, 1));
             color: white;
             border: none;
             border-radius: var(--radius-large);
@@ -1283,28 +483,10 @@
             font-size: 17px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            transition: all 0.2s ease;
             letter-spacing: -0.41px;
             margin: 24px 0;
-            position: relative;
-            overflow: hidden;
             box-shadow: var(--shadow-medium);
-        }
-        
-        .primary-button::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transform: translateX(-100%);
-            transition: transform 0.6s;
-        }
-        
-        .primary-button:hover:not(:disabled)::before {
-            transform: translateX(100%);
         }
         
         .primary-button:hover:not(:disabled) {
@@ -1324,63 +506,65 @@
             box-shadow: none;
         }
         
-        /* Modal */
-        .modal-overlay {
+        /* Settings Panel */
+        .settings-panel {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.4);
             backdrop-filter: blur(20px);
-            z-index: 1999;
+            z-index: 999;
             opacity: 0;
             visibility: hidden;
-            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+            transition: all 0.3s ease;
         }
         
-        .modal-overlay.visible {
+        .settings-panel.visible {
             opacity: 1;
             visibility: visible;
         }
         
-        .modal-content {
+        .settings-content {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
             background: var(--surface-elevated);
-            border-radius: var(--radius-xl);
-            max-width: 90vw;
-            max-height: 90vh;
-            overflow: hidden;
-            transform: scale(0.9);
-            transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+            padding: 12px 16px calc(env(safe-area-inset-bottom) + 16px);
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
             backdrop-filter: saturate(180%) blur(20px);
-            border: 0.5px solid var(--separator-non-opaque);
-            box-shadow: var(--shadow-xl);
+            border-top: 0.5px solid var(--separator-non-opaque);
         }
         
-        .modal-overlay.visible .modal-content {
-            transform: scale(1);
+        .settings-panel.visible .settings-content {
+            transform: translateY(0);
         }
         
-        .modal-header {
-            padding: 20px 20px 16px;
-            border-bottom: 0.5px solid var(--separator-non-opaque);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .settings-handle {
+            width: 36px;
+            height: 5px;
+            background: rgba(84, 84, 88, 0.6);
+            border-radius: 2.5px;
+            margin: 0 auto 20px;
         }
         
-        .modal-title {
+        .settings-title {
             font-size: 20px;
             font-weight: 600;
             color: var(--text-primary);
+            text-align: center;
+            margin-bottom: 24px;
             letter-spacing: -0.45px;
         }
         
         .close-button {
+            position: absolute;
+            top: 16px;
+            right: 16px;
             width: 32px;
             height: 32px;
             border-radius: 16px;
@@ -1407,173 +591,106 @@
             -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E") center/contain no-repeat;
         }
         
-        .modal-body {
-            padding: 20px;
-            max-height: 70vh;
-            overflow-y: auto;
+        /* Camera Interface */
+        .camera-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: black;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
         }
         
-        .photo-viewer {
-            text-align: center;
+        .camera-modal.visible {
+            opacity: 1;
+            visibility: visible;
         }
         
-        .photo-viewer img {
-            max-width: 100%;
-            max-height: 60vh;
-            border-radius: var(--radius-medium);
-            box-shadow: var(--shadow-medium);
-        }
-        
-        .photo-meta {
-            margin-top: 16px;
-            padding: 16px;
-            background: var(--fill-secondary);
-            border-radius: var(--radius-medium);
-            text-align: left;
-        }
-        
-        .meta-row {
+        .camera-header {
+            position: absolute;
+            top: env(safe-area-inset-top);
+            left: 0;
+            right: 0;
+            padding: 16px 20px;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            z-index: 1001;
             display: flex;
             justify-content: space-between;
-            margin-bottom: 8px;
-            font-size: 14px;
+            align-items: center;
         }
         
-        .meta-label {
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-        
-        .meta-value {
-            color: var(--text-primary);
+        .camera-title {
+            color: white;
+            font-size: 17px;
             font-weight: 600;
         }
         
-        /* Settings Panel */
-        .settings-panel {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(20px);
-            z-index: 999;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
-        }
-        
-        .settings-panel.visible {
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        .settings-content {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--surface-elevated);
-            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-            padding: 12px 16px calc(env(safe-area-inset-bottom) + 16px);
-            transform: translateY(100%);
-            transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
-            backdrop-filter: saturate(180%) blur(20px);
-            border-top: 0.5px solid var(--separator-non-opaque);
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        
-        .settings-panel.visible .settings-content {
-            transform: translateY(0);
-        }
-        
-        .settings-handle {
-            width: 36px;
-            height: 5px;
-            background: var(--system-gray4);
-            border-radius: 2.5px;
-            margin: 0 auto 20px;
-        }
-        
-        .settings-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: var(--text-primary);
-            text-align: center;
-            margin-bottom: 24px;
-            letter-spacing: -0.45px;
-        }
-        
-        /* Templates Panel */
-        .templates-panel {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(20px);
-            z-index: 998;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
-        }
-        
-        .templates-panel.visible {
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        .templates-content {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--surface-elevated);
-            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-            padding: 12px 16px calc(env(safe-area-inset-bottom) + 16px);
-            transform: translateY(100%);
-            transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
-            backdrop-filter: saturate(180%) blur(20px);
-            border-top: 0.5px solid var(--separator-non-opaque);
-            max-height: 70vh;
-            overflow-y: auto;
-        }
-        
-        .templates-panel.visible .templates-content {
-            transform: translateY(0);
-        }
-        
-        .template-item {
-            padding: 16px;
-            background: var(--fill-secondary);
-            border-radius: var(--radius-medium);
-            margin-bottom: 12px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
-        
-        .template-item:hover {
+        .photo-count-badge {
             background: var(--fill-tertiary);
-            transform: translateY(-1px);
-        }
-        
-        .template-name {
-            font-size: 16px;
-            font-weight: 600;
             color: var(--text-primary);
-            margin-bottom: 4px;
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 600;
+            border: 0.5px solid var(--separator-non-opaque);
         }
         
-        .template-preview {
+        .camera-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .camera-controls {
+            position: absolute;
+            bottom: calc(env(safe-area-inset-bottom) + 20px);
+            left: 0;
+            right: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            z-index: 1001;
+        }
+        
+        .capture-button {
+            width: 80px;
+            height: 80px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.1s ease;
+        }
+        
+        .capture-button:active {
+            transform: scale(0.95);
+        }
+        
+        .capture-inner {
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.1s ease;
+        }
+        
+        .capture-button:active .capture-inner {
+            transform: scale(0.9);
+        }
+        
+        .camera-info {
+            text-align: center;
+            color: white;
             font-size: 14px;
-            color: var(--text-secondary);
-            line-height: 1.4;
-            max-height: 40px;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
         
         /* Status Messages */
@@ -1587,12 +704,11 @@
             font-size: 15px;
             font-weight: 600;
             text-align: center;
-            letter-spacing: -0.24px;
             backdrop-filter: saturate(180%) blur(20px);
             border: 0.5px solid var(--separator-non-opaque);
             transform: translateY(-100px);
             opacity: 0;
-            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+            transition: all 0.3s ease;
             z-index: 1001;
             box-shadow: var(--shadow-large);
         }
@@ -1635,7 +751,7 @@
             to { transform: rotate(360deg); }
         }
         
-        /* Enhanced iOS animations */
+        /* Animations */
         @keyframes slideUp {
             from {
                 transform: translateY(20px);
@@ -1647,35 +763,11 @@
             }
         }
         
-        @keyframes scaleIn {
-            from {
-                transform: scale(0.9);
-                opacity: 0;
-            }
-            to {
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-        
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-        
         .animate-slide-up {
-            animation: slideUp 0.3s cubic-bezier(0.2, 0, 0, 1);
+            animation: slideUp 0.3s ease;
         }
         
-        .animate-scale-in {
-            animation: scaleIn 0.2s cubic-bezier(0.2, 0, 0, 1);
-        }
-        
-        .animate-pulse {
-            animation: pulse 1s ease-in-out infinite;
-        }
-        
-        /* iOS specific enhancements */
+        /* iOS specific optimizations */
         @supports (-webkit-touch-callout: none) {
             .app-container {
                 padding-top: max(16px, env(safe-area-inset-top));
@@ -1684,10 +776,6 @@
             
             .text-input, .url-input, .number-input, .primary-button {
                 -webkit-appearance: none;
-            }
-            
-            .settings-content, .templates-content {
-                padding-bottom: calc(env(safe-area-inset-bottom) + 24px);
             }
         }
         
@@ -1700,109 +788,46 @@
             .nav-large-title {
                 font-size: 28px;
             }
-            
-            .preview-grid {
-                grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-            }
-        }
-        
-        /* Haptic feedback simulation */
-        .haptic {
-            transition: transform 0.1s cubic-bezier(0.2, 0, 0, 1);
-        }
-        
-        .haptic:active {
-            transform: scale(0.98);
-        }
-        
-        /* Prevent zoom on double tap */
-        .no-zoom {
-            touch-action: manipulation;
-        }
-        
-        /* Auto-save indicator */
-        .auto-save-indicator {
-            position: fixed;
-            top: calc(env(safe-area-inset-top) + 100px);
-            right: 16px;
-            background: rgba(48, 209, 88, 0.9);
-            color: white;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            backdrop-filter: blur(10px);
-            opacity: 0;
-            transform: translateX(100px);
-            transition: all 0.3s ease;
-            z-index: 1000;
-        }
-        
-        .auto-save-indicator.show {
-            opacity: 1;
-            transform: translateX(0);
         }
     </style>
 </head>
-<body class="no-zoom">
-    <div class="dynamic-island">
-        <div class="island-pill" id="dynamicIsland">
-            <div class="island-content" id="islandContent">
-                <span id="islandText">Ready</span>
-            </div>
-        </div>
-    </div>
-
-    <div class="auto-save-indicator" id="autoSaveIndicator">
-        ✓ Auto-saved
-    </div>
-
+<body>
     <div class="app-container">
         <div class="navigation-header">
             <h1 class="nav-large-title">Card Uploader</h1>
             <p class="nav-subtitle">Upload je kaarten naar eBay</p>
-            <div class="nav-actions">
-                <button class="action-button haptic" onclick="toggleSettings()" title="Settings">
-                    <div class="action-icon icon-settings"></div>
-                    <div class="photo-counter" id="photoCounter" style="display: none;">0</div>
-                </button>
-            </div>
+            <button class="settings-button" onclick="toggleSettings()">
+                <span class="settings-icon"></span>
+                <div class="photo-counter" id="photoCounter">0</div>
+            </button>
         </div>
         
-        <div class="section-group upload-section">
+        <div class="section-group">
             <div class="section-header">
-                <h2 class="section-title">Photos</h2>
-                <div class="section-actions">
-                    <button class="mini-button" onclick="clearAllPhotos()" id="clearAllBtn" disabled>Wissen</button>
-                </div>
+                <h2 class="section-title">Foto's</h2>
+                <button class="clear-button" onclick="clearAllPhotos()" id="clearAllBtn" disabled>Wissen</button>
             </div>
             <div class="card card-elevated animate-slide-up">
-                <div class="upload-zone haptic" onclick="document.getElementById('fileInput').click()" 
+                <div class="upload-zone" onclick="startCamera()" 
                      ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
                     <div class="upload-icon-container">
                         <div class="upload-icon"></div>
                     </div>
                     <div class="upload-text">Voeg foto's toe</div>
-                    <div class="upload-subtext">Sleep bestanden of klik om te selecteren</div>
+                    <div class="upload-subtext">Klik voor camera of sleep bestanden hierheen</div>
                 </div>
                 
-                <input type="file" id="fileInput" accept="image/*" multiple capture="environment">
-                
-                <!-- Simplified camera interface -->
-                <div class="camera-actions" style="margin-top: 16px;">
-                    <button class="primary-button haptic" onclick="openOptimizedCamera()" 
-                            style="width: 100%; margin: 0; padding: 16px;">
-                        Start Camera
+                <div class="file-picker-button">
+                    <button class="primary-button" onclick="selectFiles()" style="margin: 0; padding: 12px; background: var(--fill-tertiary); color: var(--ios-blue); width: 100%;">
+                        Bestanden selecteren
                     </button>
                 </div>
+                
+                <input type="file" id="fileInput" accept="image/*" multiple>
             </div>
             
-            <div class="preview-section" id="previewSection" style="display: none;">
+            <div class="preview-section" id="previewSection">
                 <div class="preview-grid" id="previewContainer"></div>
-            </div>
-            
-            <div class="progress-container" id="progressContainer">
-                <!-- Progress items will be added here -->
             </div>
         </div>
         
@@ -1832,133 +857,89 @@
             </div>
         </div>
         
-        <button class="primary-button haptic" onclick="uploadCards()" id="uploadBtn">
+        <button class="primary-button" onclick="uploadCards()" id="uploadBtn" disabled>
             Upload naar eBay
         </button>
-    </div>
-
-    <!-- Photo Viewer Modal -->
-    <div class="modal-overlay" id="photoModal" onclick="closePhotoModal(event)">
-        <div class="modal-content" onclick="event.stopPropagation()">
-            <div class="modal-header">
-                <div class="modal-title" id="photoModalTitle">Foto Preview</div>
-                <button class="close-button" onclick="closePhotoModal()"></button>
-            </div>
-            <div class="modal-body">
-                <div class="photo-viewer">
-                    <img id="photoModalImage" src="" alt="Preview">
-                    <div class="photo-meta" id="photoModalMeta">
-                        <!-- Meta info will be added here -->
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- Settings Panel -->
     <div class="settings-panel" id="settingsPanel" onclick="closeSettings(event)">
         <div class="settings-content" onclick="event.stopPropagation()">
             <div class="settings-handle"></div>
+            <button class="close-button" onclick="closeSettings()"></button>
             <h2 class="settings-title">Instellingen</h2>
             
             <div class="form-field">
-                <label class="field-label">N8N Webhook URL</label>
+                <label class="field-label">Upload Webhook</label>
                 <input type="url" id="webhookUrl" class="url-input" 
-                       placeholder="https://your-n8n-server.com/webhook/cards"
+                       placeholder="https://your-webhook-url.com"
                        value="https://labgrowns.nl/webhook/60406624-b200-493c-aaf3-23f068a09829">
             </div>
             
             <div class="form-field" style="margin-top: 20px;">
-                <label class="field-label">Compressie kwaliteit</label>
-                <input type="range" id="compressionQuality" min="0.3" max="1.0" step="0.1" value="0.8" 
-                       style="width: 100%; margin-top: 8px;" oninput="updateCompressionDisplay()">
-                <div style="font-size: 14px; color: var(--text-secondary); margin-top: 4px;" id="compressionDisplay">
-                    Hoog (80%)
-                </div>
-            </div>
-            
-            <div class="form-field" style="margin-top: 20px;">
-                <label class="field-label">Price Check Webhook URL</label>
+                <label class="field-label">Price Check Webhook</label>
                 <input type="url" id="priceCheckUrl" class="url-input" 
-                       placeholder="https://your-n8n-server.com/webhook/pricecheck"
+                       placeholder="https://your-pricecheck-url.com"
                        value="https://labgrowns.nl/webhook-test/63ce1602-efe3-4d49-bae6-14f3717ce028">
-                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
-                    Voor automatische Google Image Search + PriceCharting
-                </div>
             </div>
             
-            <div style="margin-top: 16px; padding: 12px; background: var(--fill-secondary); border-radius: var(--radius-medium);">
-                <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">Price Check Setup</div>
-                <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4;">
-                    1. Maak een N8N workflow die POST ontvangt<br>
-                    2. Gebruik de 'image' parameter voor de foto<br>
-                    3. Open browser met: https://www.google.com/search?tbm=isch&q=[extracted_text]+pricecharting<br>
-                    4. Schakel auto price check in onderstaand
-                </div>
-            </div>
+            <button class="primary-button" onclick="testPriceCheckWebhook()" style="margin: 20px 0 0; padding: 12px;">
+                Test Price Check Webhook
+            </button>
             
-            <div class="form-field" style="margin-top: 20px;">
-                <label class="field-label">
-                    <span>Auto-bijsnijden kaarten</span>
-                    <input type="checkbox" id="autoCropEnabled" checked style="margin-left: 10px;">
-                </label>
-                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
-                    Detecteert en snijdt kaarten automatisch bij
-                </div>
+            <button class="primary-button" onclick="priceCheckAllPhotos()" id="priceCheckAllBtn" disabled style="margin: 12px 0 0; padding: 12px; background: var(--fill-tertiary); color: var(--ios-blue);">
+                Price Check Alle Foto's
+            </button>
+        </div>
+    </div>
+
+    <!-- Camera Modal -->
+    <div class="camera-modal" id="cameraModal">
+        <div class="camera-header">
+            <div class="camera-title">Camera</div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <span class="photo-count-badge" id="cameraPhotoCount">0 foto's</span>
+                <button class="close-button" onclick="closeCamera()"></button>
             </div>
-            
-            <div class="form-field" style="margin-top: 20px;">
-                <label class="field-label">
-                    <span>Camera optimalisatie</span>
-                    <input type="checkbox" id="cameraOptimizationEnabled" checked style="margin-left: 10px;">
-                </label>
-                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
-                    Schakel macro uit, gebruik betere focus voor kaarten
-                </div>
-            </div>
-            
-            <div class="form-field" style="margin-top: 20px;">
-                <label class="field-label">
-                    <span>Auto-save concepten</span>
-                    <input type="checkbox" id="autoSaveEnabled" checked style="margin-left: 10px;">
-                </label>
+        </div>
+        <video class="camera-video" id="cameraVideo" autoplay playsinline></video>
+        <div class="camera-controls">
+            <button class="capture-button" onclick="capturePhoto()">
+                <div class="capture-inner"></div>
+            </button>
+            <div class="camera-info">
+                <div>Tap om foto te maken</div>
+                <div style="font-size: 12px; opacity: 0.7;">Camera blijft open voor meerdere foto's</div>
             </div>
         </div>
     </div>
 
     <!-- Status Banner -->
     <div class="status-banner" id="statusBanner">
-        <span id="statusText">Ready</span>
+        <span id="statusText">Klaar</span>
     </div>
 
     <script>
         let selectedFiles = [];
-        let selectedPhotoIds = new Set();
+        let cameraStream = null;
         let uploadInProgress = false;
-        let draggedIndex = null;
-        let autoSaveTimeout = null;
-        
-        // Default templates (empty by default)
-        const defaultTemplates = [];
-        
-        // PWA Service Worker Registration
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(() => {});
-            });
-        }
         
         // Initialize app
         document.addEventListener('DOMContentLoaded', () => {
             loadSettings();
-            loadDraft();
+            updateCharacterCounter();
             updateUploadButton();
-            updateCharacterCounter('description');
-            showDynamicIsland('Klaar om te uploaden', 'success');
+            updatePhotoCounter();
             
             // Auto-save setup
-            document.getElementById('description').addEventListener('input', scheduleAutoSave);
+            document.getElementById('description').addEventListener('input', () => {
+                updateCharacterCounter();
+                scheduleAutoSave();
+            });
             document.getElementById('price').addEventListener('input', scheduleAutoSave);
+            document.getElementById('webhookUrl').addEventListener('input', updateUploadButton);
+            document.getElementById('webhookUrl').addEventListener('change', saveSettings);
+            document.getElementById('priceCheckUrl').addEventListener('change', saveSettings);
         });
         
         // Settings functions
@@ -1979,143 +960,6 @@
             localStorage.setItem('priceCheckUrl', document.getElementById('priceCheckUrl').value);
         }
         
-        function updatePriceCheckStatus() {
-            const statusEl = document.getElementById('priceCheckStatus');
-            const autoPriceCheckEnabled = document.getElementById('autoPriceCheckEnabled').checked;
-            const priceCheckUrl = document.getElementById('priceCheckUrl').value.trim();
-            
-            if (autoPriceCheckEnabled && priceCheckUrl && isValidUrl(priceCheckUrl)) {
-                statusEl.style.display = 'inline-block';
-            } else {
-                statusEl.style.display = 'none';
-            }
-        }
-        
-        function updateCompressionDisplay() {
-            const quality = document.getElementById('compressionQuality').value;
-            const percentage = Math.round(quality * 100);
-            let level = 'Laag';
-            if (percentage >= 80) level = 'Hoog';
-            else if (percentage >= 60) level = 'Medium';
-            
-            document.getElementById('compressionDisplay').textContent = `${level} (${percentage}%)`;
-        }
-        
-        // Auto-save functions
-        function scheduleAutoSave() {
-            if (!document.getElementById('autoSaveEnabled').checked) return;
-            
-            clearTimeout(autoSaveTimeout);
-            autoSaveTimeout = setTimeout(() => {
-                saveDraft();
-                showAutoSaveIndicator();
-            }, 2000);
-        }
-        
-        function saveDraft() {
-            const draft = {
-                description: document.getElementById('description').value,
-                price: document.getElementById('price').value,
-                timestamp: Date.now()
-            };
-            localStorage.setItem('cardUploadDraft', JSON.stringify(draft));
-        }
-        
-        function loadDraft() {
-            // Start with empty fields - no auto-loading of drafts
-            document.getElementById('description').value = '';
-            document.getElementById('price').value = '';
-            updateCharacterCounter('description');
-        }
-        
-        function showAutoSaveIndicator() {
-            const indicator = document.getElementById('autoSaveIndicator');
-            indicator.classList.add('show');
-            setTimeout(() => {
-                indicator.classList.remove('show');
-            }, 2000);
-        }
-        
-        // Templates functions
-        function loadTemplates() {
-            let templates = JSON.parse(localStorage.getItem('descriptionTemplates') || '[]');
-            // Don't load default templates - start with empty list
-            updateTemplatesList(templates);
-        }
-        
-        function updateTemplatesList(templates) {
-            const container = document.getElementById('templatesList');
-            container.innerHTML = '';
-            
-            if (templates.length === 0) {
-                const emptyState = document.createElement('div');
-                emptyState.style.cssText = `
-                    text-align: center;
-                    padding: 40px 20px;
-                    color: var(--text-secondary);
-                    font-size: 15px;
-                `;
-                emptyState.innerHTML = `
-                    <div style="margin-bottom: 12px; font-size: 18px; color: var(--text-tertiary);">•••</div>
-                    <div>Geen templates gevonden</div>
-                    <div style="font-size: 13px; margin-top: 8px;">Voer een beschrijving in en sla deze op als template</div>
-                `;
-                container.appendChild(emptyState);
-                return;
-            }
-            
-            templates.forEach((template, index) => {
-                const item = document.createElement('div');
-                item.className = 'template-item';
-                item.innerHTML = `
-                    <div class="template-name">${template.name}</div>
-                    <div class="template-preview">${template.content.substring(0, 100)}...</div>
-                `;
-                item.onclick = () => useTemplate(template.content);
-                container.appendChild(item);
-            });
-        }
-        
-        function useTemplate(content) {
-            document.getElementById('description').value = content;
-            updateCharacterCounter('description');
-            closeTemplates();
-            showStatusBanner('Template toegepast', 'success');
-            scheduleAutoSave();
-        }
-        
-        function saveCurrentAsTemplate() {
-            const description = document.getElementById('description').value.trim();
-            if (!description) {
-                showStatusBanner('Voer eerst een beschrijving in', 'error');
-                return;
-            }
-            
-            const name = prompt('Geef deze template een naam:');
-            if (!name) return;
-            
-            const templates = JSON.parse(localStorage.getItem('descriptionTemplates') || '[]');
-            templates.push({ name: name.trim(), content: description });
-            localStorage.setItem('descriptionTemplates', JSON.stringify(templates));
-            
-            updateTemplatesList(templates);
-            showStatusBanner('Template opgeslagen', 'success');
-        }
-        
-        // Dynamic Island functions
-        function showDynamicIsland(text, type = 'info') {
-            const island = document.getElementById('dynamicIsland');
-            const textEl = document.getElementById('islandText');
-            
-            textEl.textContent = text;
-            island.classList.add('show');
-            
-            setTimeout(() => {
-                island.classList.remove('show');
-            }, 3000);
-        }
-        
-        // Panel functions
         function toggleSettings() {
             const panel = document.getElementById('settingsPanel');
             panel.classList.add('visible');
@@ -2128,119 +972,117 @@
             saveSettings();
         }
         
-        function toggleTemplates() {
-            const panel = document.getElementById('templatesPanel');
-            panel.classList.add('visible');
+        // Auto-save functions
+        let autoSaveTimeout;
+        
+        function scheduleAutoSave() {
+            clearTimeout(autoSaveTimeout);
+            autoSaveTimeout = setTimeout(() => {
+                saveDraft();
+            }, 2000);
         }
         
-        function closeTemplates(event) {
-            if (event && event.target !== event.currentTarget) return;
-            const panel = document.getElementById('templatesPanel');
-            panel.classList.remove('visible');
+        function saveDraft() {
+            const draft = {
+                description: document.getElementById('description').value,
+                price: document.getElementById('price').value,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('cardUploadDraft', JSON.stringify(draft));
         }
         
-        // Photo modal functions
-        function openPhotoModal(file, index) {
-            const modal = document.getElementById('photoModal');
-            const img = document.getElementById('photoModalImage');
-            const title = document.getElementById('photoModalTitle');
-            const meta = document.getElementById('photoModalMeta');
+        // Camera functions
+        async function startCamera() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showStatusBanner('Camera niet beschikbaar op dit apparaat', 'error');
+                return;
+            }
             
-            title.textContent = `Foto ${index + 1} van ${selectedFiles.length}`;
-            img.src = URL.createObjectURL(file);
-            
-            // Show metadata
-            const sizeKB = Math.round(file.size / 1024);
-            meta.innerHTML = `
-                <div class="meta-row">
-                    <span class="meta-label">Bestandsnaam:</span>
-                    <span class="meta-value">${file.name}</span>
-                </div>
-                <div class="meta-row">
-                    <span class="meta-label">Grootte:</span>
-                    <span class="meta-value">${sizeKB} KB</span>
-                </div>
-                <div class="meta-row">
-                    <span class="meta-label">Type:</span>
-                    <span class="meta-value">${file.type}</span>
-                </div>
-                <div class="meta-row">
-                    <span class="meta-label">Laatst gewijzigd:</span>
-                    <span class="meta-value">${new Date(file.lastModified).toLocaleDateString('nl-NL')}</span>
-                </div>
-            `;
-            
-            modal.classList.add('visible');
-        }
-        
-        function closePhotoModal(event) {
-            if (event && event.target !== event.currentTarget) return;
-            const modal = document.getElementById('photoModal');
-            modal.classList.remove('visible');
-        }
-        
-        // Character counter
-        function updateCharacterCounter(fieldId) {
-            const field = document.getElementById(fieldId);
-            const counter = document.getElementById(fieldId + 'Counter');
-            if (field && counter) {
-                const maxLength = field.getAttribute('maxlength') || '∞';
-                counter.textContent = `${field.value.length}/${maxLength}`;
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: 'environment',
+                        focusMode: 'continuous',
+                        focusDistance: { ideal: 0.3 },
+                        zoom: { ideal: 1.0 },
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
+                };
+                
+                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                
+                const cameraModal = document.getElementById('cameraModal');
+                const video = document.getElementById('cameraVideo');
+                
+                video.srcObject = cameraStream;
+                cameraModal.classList.add('visible');
+                
+                updateCameraPhotoCount();
+                
+            } catch (error) {
+                console.error('Camera error:', error);
+                showStatusBanner('Camera kon niet worden geopend', 'error');
+                selectFiles();
             }
         }
         
-        // Quick price buttons
-        function setQuickPrice(price) {
-            document.getElementById('price').value = price.toFixed(2);
-            scheduleAutoSave();
-            showStatusBanner(`Prijs ingesteld op €${price.toFixed(2)}`, 'success');
-        }
-        
-        // Photo selection functions
-        function selectAllPhotos() {
-            selectedPhotoIds.clear();
-            selectedFiles.forEach((_, index) => selectedPhotoIds.add(index));
-            updatePreview();
-            updatePhotoButtons();
-        }
-        
-        function removeSelectedPhotos() {
-            if (selectedPhotoIds.size === 0) return;
+        function closeCamera() {
+            const cameraModal = document.getElementById('cameraModal');
+            cameraModal.classList.remove('visible');
             
-            const indicesToRemove = Array.from(selectedPhotoIds).sort((a, b) => b - a);
-            indicesToRemove.forEach(index => {
-                selectedFiles.splice(index, 1);
-            });
-            
-            selectedPhotoIds.clear();
-            updatePreview();
-            updatePhotoCounter();
-            updatePhotoButtons();
-            
-            showStatusBanner(`${indicesToRemove.length} foto's verwijderd`, 'success');
-        }
-        
-        function clearAllPhotos() {
-            if (selectedFiles.length === 0) return;
-            
-            if (confirm('Weet je zeker dat je alle foto\'s wilt verwijderen?')) {
-                selectedFiles = [];
-                selectedPhotoIds.clear();
-                updatePreview();
-                updatePhotoCounter();
-                updatePhotoButtons();
-                document.getElementById('fileInput').value = '';
-                showStatusBanner('Alle foto\'s verwijderd', 'success');
-                showDynamicIsland('Klaar om te uploaden', 'info');
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
             }
         }
         
-        function updatePhotoButtons() {
-            const hasPhotos = selectedFiles.length > 0;
-            document.getElementById('clearAllBtn').disabled = !hasPhotos;
+        function capturePhoto() {
+            const video = document.getElementById('cameraVideo');
+            if (!video) return;
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            // Flash effect
+            video.style.filter = 'brightness(1.5)';
+            setTimeout(() => {
+                video.style.filter = 'none';
+            }, 150);
+            
+            // Haptic feedback
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+            
+            canvas.toBlob((blob) => {
+                const file = new File([blob], `card_${Date.now()}.jpg`, {
+                    type: 'image/jpeg',
+                    lastModified: Date.now()
+                });
+                
+                handleFiles([file]);
+                updateCameraPhotoCount();
+                
+            }, 'image/jpeg', 0.95);
+        }
+        
+        function updateCameraPhotoCount() {
+            const badge = document.getElementById('cameraPhotoCount');
+            if (badge) {
+                badge.textContent = `${selectedFiles.length} foto's`;
+            }
         }
         
         // File handling
+        function selectFiles() {
+            document.getElementById('fileInput').click();
+        }
+        
         document.getElementById('fileInput').addEventListener('change', (e) => {
             handleFiles(e.target.files);
         });
@@ -2265,7 +1107,6 @@
             if (uploadInProgress) return;
             
             showStatusBanner('Foto\'s verwerken...', 'loading');
-            showProgressContainer(true);
             
             const validFiles = Array.from(files).filter(file => {
                 if (!file.type.startsWith('image/')) {
@@ -2279,125 +1120,172 @@
                 return true;
             });
             
-            const progressContainer = document.getElementById('progressContainer');
-            progressContainer.innerHTML = '';
-            
-            const compressedFiles = [];
-            for (let i = 0; i < validFiles.length; i++) {
-                const file = validFiles[i];
-                
-                // Add progress item
-                const progressItem = createProgressItem(file, i);
-                progressContainer.appendChild(progressItem);
-                
+            const processedFiles = [];
+            for (const file of validFiles) {
                 try {
-                    updateProgress(i, 0, 'Verwerken...');
-                    let processedFile = file;
-                    
-                    // Auto crop always enabled
-                    updateProgress(i, 20, 'Bijsnijden...');
-                    processedFile = await autoCropCard(processedFile, (progress) => {
-                        updateProgress(i, 20 + progress * 30, 'Bijsnijden...');
-                    });
-                    
-                    updateProgress(i, 50, 'Comprimeren...');
-                    const compressed = await compressImage(processedFile, (progress) => {
-                        updateProgress(i, 50 + progress * 50, 'Comprimeren...');
-                    });
-                    
-                    updateProgress(i, 100, 'Voltooid');
-                    compressedFiles.push(compressed);
+                    const cropped = await autoCropCard(file);
+                    const compressed = await compressImage(cropped);
+                    processedFiles.push(compressed);
                 } catch (error) {
-                    console.error('Compression error:', error);
-                    updateProgress(i, 100, 'Fout opgetreden');
-                    compressedFiles.push(file);
+                    console.error('Processing error:', error);
+                    processedFiles.push(file);
                 }
             }
             
-            selectedFiles = [...selectedFiles, ...compressedFiles];
+            const wasEmpty = selectedFiles.length === 0;
+            selectedFiles = [...selectedFiles, ...processedFiles];
             
-            // Auto price check voor eerste foto
-            if (compressedFiles.length > 0 && selectedFiles.length === compressedFiles.length) {
-                // Dit was de eerste upload sessie
-                await performAutoPriceCheck(compressedFiles[0]);
+            // Auto price check: verstuur eerste foto naar workflow zodra deze is ingeladen
+            if (wasEmpty && processedFiles.length > 0) {
+                showStatusBanner('Eerste foto wordt verstuurd voor price check...', 'loading');
+                await performAutoPriceCheck(processedFiles[0]);
             }
             
-            setTimeout(() => {
-                showProgressContainer(false);
-                updatePreview();
-                updatePhotoCounter();
-                updatePhotoButtons();
-                
-                // Update camera interface if open
-                updateCameraPhotoCount();
-                
-                if (compressedFiles.length > 0) {
-                    const totalSize = compressedFiles.reduce((sum, file) => sum + file.size, 0);
-                    const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(1);
-                    showStatusBanner(`${compressedFiles.length} foto${compressedFiles.length > 1 ? '\'s' : ''} toegevoegd (${totalSizeMB}MB)`, 'success');
-                    showDynamicIsland(`${selectedFiles.length} foto's klaar`, 'success');
-                }
-            }, 1000);
-        }
-        
-        function createProgressItem(file, index) {
-            const item = document.createElement('div');
-            item.className = 'progress-item';
-            item.innerHTML = `
-                <div class="progress-thumb"></div>
-                <div class="progress-info">
-                    <div class="progress-name">${file.name}</div>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progress-${index}"></div>
-                    </div>
-                    <div class="progress-status" id="status-${index}">Wachten...</div>
-                </div>
-            `;
+            updatePreview();
+            updatePhotoCounter();
+            updateUploadButton();
             
-            // Set thumbnail
-            const thumb = item.querySelector('.progress-thumb');
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                thumb.style.backgroundImage = `url(${e.target.result})`;
-                thumb.style.backgroundSize = 'cover';
-                thumb.style.backgroundPosition = 'center';
-            };
-            reader.readAsDataURL(file);
-            
-            return item;
-        }
-        
-        function updateProgress(index, percentage, status) {
-            const fill = document.getElementById(`progress-${index}`);
-            const statusEl = document.getElementById(`status-${index}`);
-            
-            if (fill) fill.style.width = `${percentage}%`;
-            if (statusEl) statusEl.textContent = status;
-        }
-        
-        function showProgressContainer(show) {
-            const container = document.getElementById('progressContainer');
-            if (show) {
-                container.classList.add('show');
-            } else {
-                container.classList.remove('show');
+            if (processedFiles.length > 0) {
+                const totalSize = processedFiles.reduce((sum, file) => sum + file.size, 0);
+                const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(1);
+                showStatusBanner(`${processedFiles.length} foto${processedFiles.length > 1 ? '\'s' : ''} toegevoegd (${totalSizeMB}MB)`, 'success');
             }
         }
         
-        function compressImage(file, onProgress = () => {}) {
+        // Auto-crop function
+        async function autoCropCard(file) {
             return new Promise((resolve) => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 const img = new Image();
                 
-                const quality = parseFloat(document.getElementById('compressionQuality').value);
-                const maxWidth = 1920;
-                const maxHeight = 1920;
+                img.onload = function() {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const cropRect = detectCardBounds(ctx, img.width, img.height);
+                    
+                    if (cropRect) {
+                        const croppedCanvas = document.createElement('canvas');
+                        const croppedCtx = croppedCanvas.getContext('2d');
+                        
+                        croppedCanvas.width = cropRect.width;
+                        croppedCanvas.height = cropRect.height;
+                        
+                        croppedCtx.drawImage(
+                            img,
+                            cropRect.x, cropRect.y, cropRect.width, cropRect.height,
+                            0, 0, cropRect.width, cropRect.height
+                        );
+                        
+                        croppedCanvas.toBlob((blob) => {
+                            const croppedFile = new File([blob], file.name, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now()
+                            });
+                            resolve(croppedFile);
+                        }, 'image/jpeg', 0.95);
+                    } else {
+                        resolve(file);
+                    }
+                };
+                
+                img.src = URL.createObjectURL(file);
+            });
+        }
+        
+        function detectCardBounds(ctx, width, height) {
+            try {
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const data = imageData.data;
+                
+                const gray = new Array(width * height);
+                for (let i = 0; i < data.length; i += 4) {
+                    const grayValue = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+                    gray[i / 4] = grayValue;
+                }
+                
+                let minX = width, maxX = 0, minY = height, maxY = 0;
+                let foundEdges = false;
+                const threshold = 30;
+                
+                for (let y = 0; y < height; y++) {
+                    for (let x = 1; x < width - 1; x++) {
+                        const current = gray[y * width + x];
+                        const prev = gray[y * width + (x - 1)];
+                        const next = gray[y * width + (x + 1)];
+                        
+                        if (Math.abs(current - prev) > threshold || Math.abs(current - next) > threshold) {
+                            minX = Math.min(minX, x);
+                            maxX = Math.max(maxX, x);
+                            minY = Math.min(minY, y);
+                            maxY = Math.max(maxY, y);
+                            foundEdges = true;
+                        }
+                    }
+                }
+                
+                for (let x = 0; x < width; x++) {
+                    for (let y = 1; y < height - 1; y++) {
+                        const current = gray[y * width + x];
+                        const prev = gray[(y - 1) * width + x];
+                        const next = gray[(y + 1) * width + x];
+                        
+                        if (Math.abs(current - prev) > threshold || Math.abs(current - next) > threshold) {
+                            minX = Math.min(minX, x);
+                            maxX = Math.max(maxX, x);
+                            minY = Math.min(minY, y);
+                            maxY = Math.max(maxY, y);
+                            foundEdges = true;
+                        }
+                    }
+                }
+                
+                if (!foundEdges) return null;
+                
+                const padding = Math.min(width, height) * 0.05;
+                minX = Math.max(0, minX - padding);
+                minY = Math.max(0, minY - padding);
+                maxX = Math.min(width, maxX + padding);
+                maxY = Math.min(height, maxY + padding);
+                
+                const cropWidth = maxX - minX;
+                const cropHeight = maxY - minY;
+                
+                if (cropWidth < width * 0.3 || cropHeight < height * 0.3) {
+                    return null;
+                }
+                
+                const aspectRatio = cropWidth / cropHeight;
+                if (aspectRatio < 0.5 || aspectRatio > 2.0) {
+                    return null;
+                }
+                
+                return {
+                    x: Math.round(minX),
+                    y: Math.round(minY),
+                    width: Math.round(cropWidth),
+                    height: Math.round(cropHeight)
+                };
+                
+            } catch (error) {
+                console.warn('Auto-crop failed:', error);
+                return null;
+            }
+        }
+        
+        // Image compression
+        function compressImage(file) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
                 
                 img.onload = function() {
-                    onProgress(0.3);
-                    
                     let { width, height } = img;
+                    const maxWidth = 1920;
+                    const maxHeight = 1920;
                     
                     if (width > height) {
                         if (width > maxWidth) {
@@ -2413,25 +1301,116 @@
                     
                     canvas.width = width;
                     canvas.height = height;
-                    
-                    onProgress(0.6);
                     ctx.drawImage(img, 0, 0, width, height);
                     
-                    onProgress(0.9);
                     canvas.toBlob((blob) => {
                         const compressedFile = new File([blob], file.name, {
                             type: 'image/jpeg',
                             lastModified: Date.now()
                         });
-                        onProgress(1.0);
                         resolve(compressedFile);
-                    }, 'image/jpeg', quality);
+                    }, 'image/jpeg', 0.8);
                 };
                 
                 img.src = URL.createObjectURL(file);
             });
         }
         
+        // Price check functions
+        async function performAutoPriceCheck(file) {
+            const priceCheckUrl = document.getElementById('priceCheckUrl').value.trim();
+            
+            if (!priceCheckUrl || !isValidUrl(priceCheckUrl)) {
+                return;
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('image', file);
+                formData.append('filename', file.name);
+                formData.append('timestamp', new Date().toISOString());
+                formData.append('action', 'pricecheck');
+                
+                const response = await fetch(priceCheckUrl, {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                if (response.ok) {
+                    showStatusBanner('Price check geopend op je computer', 'success');
+                }
+                
+            } catch (error) {
+                console.error('Price check error:', error);
+            }
+        }
+        
+        // Manual price check for specific photo
+        async function manualPriceCheck(fileIndex) {
+            if (fileIndex >= selectedFiles.length) return;
+            
+            const file = selectedFiles[fileIndex];
+            showStatusBanner('Price check wordt uitgevoerd...', 'loading');
+            await performAutoPriceCheck(file);
+        }
+        
+        // Price check all photos
+        async function priceCheckAllPhotos() {
+            if (selectedFiles.length === 0) return;
+            
+            showStatusBanner(`Price check van ${selectedFiles.length} foto's wordt uitgevoerd...`, 'loading');
+            
+            for (let i = 0; i < selectedFiles.length; i++) {
+                await performAutoPriceCheck(selectedFiles[i]);
+                // Small delay between requests
+                if (i < selectedFiles.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            }
+            
+            showStatusBanner(`Price check van ${selectedFiles.length} foto's voltooid`, 'success');
+        }
+        
+        // Test price check webhook
+        async function testPriceCheckWebhook() {
+            const priceCheckUrl = document.getElementById('priceCheckUrl').value.trim();
+            
+            if (!priceCheckUrl) {
+                showStatusBanner('Voer eerst een Price Check URL in', 'error');
+                return;
+            }
+            
+            if (!isValidUrl(priceCheckUrl)) {
+                showStatusBanner('Ongeldige Price Check URL', 'error');
+                return;
+            }
+            
+            try {
+                showStatusBanner('Price Check webhook testen...', 'loading');
+                
+                const formData = new FormData();
+                formData.append('test', 'true');
+                formData.append('message', 'Test vanuit Card Uploader');
+                formData.append('timestamp', new Date().toISOString());
+                
+                const response = await fetch(priceCheckUrl, {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                if (response.ok) {
+                    showStatusBanner('Price Check webhook werkt perfect!', 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+            } catch (error) {
+                console.error('Price check test error:', error);
+                showStatusBanner(`Webhook test mislukt: ${error.message}`, 'error');
+            }
+        }
+        
+        // Preview functions
         function updatePreview() {
             const container = document.getElementById('previewContainer');
             const section = document.getElementById('previewSection');
@@ -2446,126 +1425,72 @@
             
             selectedFiles.forEach((file, index) => {
                 const previewDiv = document.createElement('div');
-                previewDiv.className = 'preview-item animate-scale-in';
-                if (selectedPhotoIds.has(index)) {
-                    previewDiv.classList.add('selected');
-                }
+                previewDiv.className = 'preview-item';
                 
                 const img = document.createElement('img');
                 img.className = 'preview-image';
                 img.src = URL.createObjectURL(file);
                 img.alt = `Preview ${index + 1}`;
-                img.onclick = () => openPhotoModal(file, index);
-                
-                const overlay = document.createElement('div');
-                overlay.className = 'preview-overlay';
-                overlay.onclick = (e) => {
-                    e.stopPropagation();
-                    togglePhotoSelection(index);
-                };
                 
                 const info = document.createElement('div');
                 info.className = 'preview-info';
                 info.textContent = `${Math.round(file.size / 1024)}KB`;
                 
                 const removeBtn = document.createElement('button');
-                removeBtn.className = 'remove-button haptic';
+                removeBtn.className = 'remove-button';
                 removeBtn.onclick = (e) => {
                     e.stopPropagation();
                     removeFile(index);
                 };
                 
+                const priceCheckBtn = document.createElement('button');
+                priceCheckBtn.className = 'price-check-button';
+                priceCheckBtn.title = 'Price check';
+                priceCheckBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    manualPriceCheck(index);
+                };
+                
                 previewDiv.appendChild(img);
-                previewDiv.appendChild(overlay);
                 previewDiv.appendChild(info);
                 previewDiv.appendChild(removeBtn);
+                previewDiv.appendChild(priceCheckBtn);
                 container.appendChild(previewDiv);
             });
-            
-            updateUploadButton();
-        }
-        
-        function togglePhotoSelection(index) {
-            if (selectedPhotoIds.has(index)) {
-                selectedPhotoIds.delete(index);
-            } else {
-                selectedPhotoIds.add(index);
-            }
-            updatePreview();
-            updatePhotoButtons();
-        }
-        
-        // Drag and drop reordering
-        function handleDragStart(e, index) {
-            draggedIndex = index;
-            e.dataTransfer.effectAllowed = 'move';
-            e.target.closest('.preview-item').classList.add('dragging');
-        }
-        
-        function handleDragOver2(e) {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'move';
-        }
-        
-        function handleDrop2(e, dropIndex) {
-            e.preventDefault();
-            
-            if (draggedIndex === null || draggedIndex === dropIndex) return;
-            
-            // Reorder files
-            const draggedFile = selectedFiles[draggedIndex];
-            selectedFiles.splice(draggedIndex, 1);
-            selectedFiles.splice(dropIndex, 0, draggedFile);
-            
-            // Update selection indices
-            const newSelectedIds = new Set();
-            selectedPhotoIds.forEach(id => {
-                if (id === draggedIndex) {
-                    newSelectedIds.add(dropIndex);
-                } else if (id < draggedIndex && id >= dropIndex) {
-                    newSelectedIds.add(id + 1);
-                } else if (id > draggedIndex && id <= dropIndex) {
-                    newSelectedIds.add(id - 1);
-                } else {
-                    newSelectedIds.add(id);
-                }
-            });
-            selectedPhotoIds = newSelectedIds;
-            
-            draggedIndex = null;
-            updatePreview();
-            showStatusBanner('Foto volgorde aangepast', 'success');
         }
         
         function removeFile(index) {
             selectedFiles.splice(index, 1);
-            
-            // Update selection indices
-            const newSelectedIds = new Set();
-            selectedPhotoIds.forEach(id => {
-                if (id < index) newSelectedIds.add(id);
-                else if (id > index) newSelectedIds.add(id - 1);
-            });
-            selectedPhotoIds = newSelectedIds;
-            
             updatePreview();
             updatePhotoCounter();
-            updatePhotoButtons();
+            updateUploadButton();
+        }
+        
+        function clearAllPhotos() {
+            if (selectedFiles.length === 0) return;
             
-            if (selectedFiles.length === 0) {
-                showDynamicIsland('Klaar om te uploaden', 'info');
-            } else {
-                showDynamicIsland(`${selectedFiles.length} foto's klaar`, 'success');
+            if (confirm('Weet je zeker dat je alle foto\'s wilt verwijderen?')) {
+                selectedFiles = [];
+                updatePreview();
+                updatePhotoCounter();
+                updateUploadButton();
+                document.getElementById('fileInput').value = '';
+                showStatusBanner('Alle foto\'s verwijderd', 'success');
             }
         }
         
+        // UI update functions
         function updatePhotoCounter() {
             const counter = document.getElementById('photoCounter');
+            const clearBtn = document.getElementById('clearAllBtn');
+            
             if (selectedFiles.length > 0) {
                 counter.textContent = selectedFiles.length;
                 counter.style.display = 'flex';
+                clearBtn.disabled = false;
             } else {
                 counter.style.display = 'none';
+                clearBtn.disabled = true;
             }
         }
         
@@ -2582,12 +1507,14 @@
             }
         }
         
-        // Event listeners for auto-save and validation
-        document.getElementById('webhookUrl').addEventListener('input', updateUploadButton);
-        document.getElementById('webhookUrl').addEventListener('change', saveSettings);
-        document.getElementById('priceCheckUrl').addEventListener('change', saveSettings);
-        document.getElementById('description').addEventListener('input', () => updateCharacterCounter('description'));
+        function updateCharacterCounter() {
+            const field = document.getElementById('description');
+            const counter = document.getElementById('descriptionCounter');
+            const maxLength = field.getAttribute('maxlength') || '∞';
+            counter.textContent = `${field.value.length}/${maxLength}`;
+        }
         
+        // Upload function
         async function uploadCards() {
             if (uploadInProgress) return;
             
@@ -2601,7 +1528,7 @@
             }
             
             if (!webhookUrl) {
-                showStatusBanner('Voer eerst je N8N webhook URL in', 'error');
+                showStatusBanner('Voer eerst je webhook URL in', 'error');
                 toggleSettings();
                 return;
             }
@@ -2614,7 +1541,6 @@
             uploadInProgress = true;
             updateUploadButton();
             showStatusBanner('Uploaden naar eBay...', 'loading');
-            showDynamicIsland('Uploaden...', 'loading');
             
             try {
                 const formData = new FormData();
@@ -2640,18 +1566,15 @@
                 await response.json().catch(() => ({}));
                 
                 showStatusBanner(`${selectedFiles.length} foto${selectedFiles.length > 1 ? '\'s' : ''} succesvol geüpload naar eBay!`, 'success');
-                showDynamicIsland('Upload voltooid!', 'success');
                 
                 // Reset form
                 selectedFiles = [];
-                selectedPhotoIds.clear();
                 document.getElementById('description').value = '';
                 document.getElementById('price').value = '';
                 document.getElementById('fileInput').value = '';
                 updatePreview();
                 updatePhotoCounter();
-                updatePhotoButtons();
-                updateCharacterCounter('description');
+                updateCharacterCounter();
                 
                 // Clear draft
                 localStorage.removeItem('cardUploadDraft');
@@ -2659,13 +1582,13 @@
             } catch (error) {
                 console.error('Upload error:', error);
                 showStatusBanner(`Upload mislukt: ${error.message}`, 'error');
-                showDynamicIsland('Upload mislukt', 'error');
             } finally {
                 uploadInProgress = false;
                 updateUploadButton();
             }
         }
         
+        // Utility functions
         function showStatusBanner(message, type) {
             const banner = document.getElementById('statusBanner');
             const text = document.getElementById('statusText');
@@ -2695,104 +1618,6 @@
                 return false;
             }
         }
-        
-        // Prevent zoom on double tap
-        let lastTouchEnd = 0;
-        document.addEventListener('touchend', function (event) {
-            const now = (new Date()).getTime();
-            if (now - lastTouchEnd <= 300) {
-                event.preventDefault();
-            }
-            lastTouchEnd = now;
-        }, false);
-        
-        // Handle viewport changes
-        function updateViewport() {
-            const vh = window.innerHeight * 0.01;
-            document.documentElement.style.setProperty('--vh', `${vh}px`);
-        }
-        
-        window.addEventListener('resize', updateViewport);
-        window.addEventListener('orientationchange', updateViewport);
-        updateViewport();
-        
-        // Keyboard shortcuts
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey || e.metaKey) {
-                switch (e.key) {
-                    case 's':
-                        e.preventDefault();
-                        saveDraft();
-                        showAutoSaveIndicator();
-                        break;
-                    case 'a':
-                        if (selectedFiles.length > 0) {
-                            e.preventDefault();
-                            selectAllPhotos();
-                        }
-                        break;
-                }
-            }
-            
-            if (e.key === 'Escape') {
-                closePhotoModal();
-                closeSettings();
-                closeTemplates();
-            }
-        });
-        
-        // PWA Install prompt
-        let deferredPrompt;
-        
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-            
-            setTimeout(() => {
-                if (deferredPrompt && !window.matchMedia('(display-mode: standalone)').matches) {
-                    showInstallPrompt();
-                }
-            }, 5000);
-        });
-        
-        function showInstallPrompt() {
-            const installBtn = document.createElement('button');
-            installBtn.className = 'primary-button';
-            installBtn.style.background = 'linear-gradient(135deg, var(--ios-purple), var(--ios-pink))';
-            installBtn.style.marginTop = '16px';
-            installBtn.textContent = 'Installeer App';
-            installBtn.onclick = installApp;
-            
-            document.querySelector('.app-container').appendChild(installBtn);
-        }
-        
-        async function installApp() {
-            if (!deferredPrompt) return;
-            
-            deferredPrompt.prompt();
-            const result = await deferredPrompt.userChoice;
-            
-            if (result.outcome === 'accepted') {
-                showStatusBanner('App wordt geïnstalleerd...', 'success');
-                showDynamicIsland('App installeren...', 'success');
-            }
-            
-            deferredPrompt = null;
-            event.target.remove();
-        }
-        
-        // Add haptic feedback simulation
-        document.addEventListener('touchstart', function(e) {
-            if (e.target.classList.contains('haptic')) {
-                e.target.style.transform = 'scale(0.98)';
-            }
-        });
-        
-        document.addEventListener('touchend', function(e) {
-            if (e.target.classList.contains('haptic')) {
-                e.target.style.transform = '';
-            }
-        });
     </script>
 </body>
 </html>
