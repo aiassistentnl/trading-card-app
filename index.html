@@ -1,13 +1,27 @@
-<!DOCTYPE html>
+<div class="form-field" style="margin-top: 20px;">
+                <label class="field-label">
+                    <span>Auto Price Check eerste foto</span>
+                    <input type="checkbox" id="autoPriceCheckEnabled" checked style="margin-left: 10px;">
+                </label>
+                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+                    Stuurt eerste foto automatisch naar price check workflow
+                </div>
+                
+                <div style="margin-top: 12px;">
+                    <button class="primary-button" onclick="testPriceCheckWebhook()" id="testPriceCheckBtn" style="margin: 0; padding: 12px 20px; font-size: 15px;">
+                        Test Price Check
+                    </button>
+                </div>
+            </div><!DOCTYPE html>
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Card Uploader</title>
+    <title>Card Uploader Pro</title>
     <meta name="theme-color" content="#007AFF">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Card Uploader">
+    <meta name="apple-mobile-web-app-title" content="Card Uploader Pro">
     
     <style>
         :root {
@@ -19,6 +33,7 @@
             --ios-purple: #BF5AF2;
             --ios-pink: #FF2D92;
             --ios-teal: #40C8E0;
+            --ios-yellow: #FFD60A;
             
             --background-primary: #000000;
             --background-secondary: #1C1C1E;
@@ -63,6 +78,398 @@
             --shadow-medium: 0 4px 6px rgba(0, 0, 0, 0.16), 0 2px 4px rgba(0, 0, 0, 0.06);
             --shadow-large: 0 10px 15px rgba(0, 0, 0, 0.1), 0 4px 6px rgba(0, 0, 0, 0.05);
             --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15), 0 10px 10px rgba(0, 0, 0, 0.04);
+        }
+        
+        // Manual price check function
+        async function manualPriceCheck(fileIndex) {
+            if (fileIndex >= selectedFiles.length) return;
+            
+            const file = selectedFiles[fileIndex];
+            await performAutoPriceCheck(file);
+        }
+        
+        // Manual crop modal
+        function openCropModal(file, index) {
+            // For now, show a simple alert - you can expand this to a full crop interface
+            if (confirm('Wil je deze foto handmatig bijsnijden? (Tip: Gebruik auto-crop in instellingen voor automatisch bijsnijden)')) {
+                // Here you could implement a manual crop interface
+                showStatusBanner('Handmatige crop tool komt binnenkort!', 'info');
+            }
+        }
+        
+        // Price checking functions
+        async function performAutoPriceCheck(file) {
+            const priceCheckUrl = document.getElementById('priceCheckUrl').value.trim();
+            
+            if (!priceCheckUrl || !isValidUrl(priceCheckUrl)) {
+                return;
+            }
+            
+            try {
+                showDynamicIsland('Price check wordt uitgevoerd...', 'loading');
+                
+                const formData = new FormData();
+                formData.append('image', file);
+                formData.append('filename', file.name);
+                formData.append('timestamp', new Date().toISOString());
+                formData.append('action', 'pricecheck');
+                
+                const response = await fetch(priceCheckUrl, {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                if (response.ok) {
+                    showDynamicIsland('Price check succesvol verstuurd!', 'success');
+                    showStatusBanner('Price check geopend op je computer', 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+            } catch (error) {
+                console.error('Price check error:', error);
+                showDynamicIsland('Price check mislukt', 'error');
+            }
+        }
+        
+        // Auto-crop functions
+        async function autoCropCard(file, onProgress = () => {}) {
+            return new Promise((resolve) => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                const img = new Image();
+                
+                img.onload = function() {
+                    onProgress(0.2);
+                    
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    onProgress(0.4);
+                    
+                    // Simple edge detection and crop
+                    const cropRect = detectCardBounds(ctx, img.width, img.height);
+                    
+                    onProgress(0.7);
+                    
+                    if (cropRect) {
+                        // Create new canvas with cropped dimensions
+                        const croppedCanvas = document.createElement('canvas');
+                        const croppedCtx = croppedCanvas.getContext('2d');
+                        
+                        croppedCanvas.width = cropRect.width;
+                        croppedCanvas.height = cropRect.height;
+                        
+                        croppedCtx.drawImage(
+                            img,
+                            cropRect.x, cropRect.y, cropRect.width, cropRect.height,
+                            0, 0, cropRect.width, cropRect.height
+                        );
+                        
+                        onProgress(0.9);
+                        
+                        croppedCanvas.toBlob((blob) => {
+                            const croppedFile = new File([blob], file.name, {
+                                type: 'image/jpeg',
+                                lastModified: Date.now()
+                            });
+                            onProgress(1.0);
+                            resolve(croppedFile);
+                        }, 'image/jpeg', 0.95);
+                    } else {
+                        // No card detected, return original
+                        onProgress(1.0);
+                        resolve(file);
+                    }
+                };
+                
+                img.src = URL.createObjectURL(file);
+            });
+        }
+        
+        function detectCardBounds(ctx, width, height) {
+            try {
+                const imageData = ctx.getImageData(0, 0, width, height);
+                const data = imageData.data;
+                
+                // Convert to grayscale and find edges
+                const gray = new Array(width * height);
+                for (let i = 0; i < data.length; i += 4) {
+                    const grayValue = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+                    gray[i / 4] = grayValue;
+                }
+                
+                // Simple edge detection (looking for card boundaries)
+                let minX = width, maxX = 0, minY = height, maxY = 0;
+                let foundEdges = false;
+                
+                const threshold = 30; // Edge detection threshold
+                
+                // Scan for vertical edges
+                for (let y = 0; y < height; y++) {
+                    for (let x = 1; x < width - 1; x++) {
+                        const current = gray[y * width + x];
+                        const prev = gray[y * width + (x - 1)];
+                        const next = gray[y * width + (x + 1)];
+                        
+                        if (Math.abs(current - prev) > threshold || Math.abs(current - next) > threshold) {
+                            minX = Math.min(minX, x);
+                            maxX = Math.max(maxX, x);
+                            minY = Math.min(minY, y);
+                            maxY = Math.max(maxY, y);
+                            foundEdges = true;
+                        }
+                    }
+                }
+                
+                // Scan for horizontal edges
+                for (let x = 0; x < width; x++) {
+                    for (let y = 1; y < height - 1; y++) {
+                        const current = gray[y * width + x];
+                        const prev = gray[(y - 1) * width + x];
+                        const next = gray[(y + 1) * width + x];
+                        
+                        if (Math.abs(current - prev) > threshold || Math.abs(current - next) > threshold) {
+                            minX = Math.min(minX, x);
+                            maxX = Math.max(maxX, x);
+                            minY = Math.min(minY, y);
+                            maxY = Math.max(maxY, y);
+                            foundEdges = true;
+                        }
+                    }
+                }
+                
+                if (!foundEdges) return null;
+                
+                // Add some padding and ensure reasonable dimensions
+                const padding = Math.min(width, height) * 0.05; // 5% padding
+                minX = Math.max(0, minX - padding);
+                minY = Math.max(0, minY - padding);
+                maxX = Math.min(width, maxX + padding);
+                maxY = Math.min(height, maxY + padding);
+                
+                const cropWidth = maxX - minX;
+                const cropHeight = maxY - minY;
+                
+                // Ensure minimum size and reasonable aspect ratio
+                if (cropWidth < width * 0.3 || cropHeight < height * 0.3) {
+                    return null; // Too small, probably not a card
+                }
+                
+                const aspectRatio = cropWidth / cropHeight;
+                if (aspectRatio < 0.5 || aspectRatio > 2.0) {
+                    return null; // Unreasonable aspect ratio for a card
+                }
+                
+                return {
+                    x: Math.round(minX),
+                    y: Math.round(minY),
+                    width: Math.round(cropWidth),
+                    height: Math.round(cropHeight)
+                };
+                
+            } catch (error) {
+                console.warn('Auto-crop failed:', error);
+                return null;
+            }
+        }
+        
+        // Camera optimization functions
+        let cameraStream = null;
+        let cameraModal = null;
+        
+        async function openOptimizedCamera() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showStatusBanner('Camera niet beschikbaar op dit apparaat', 'error');
+                return;
+            }
+            
+            try {
+                const constraints = {
+                    video: {
+                        facingMode: 'environment', // Rear camera
+                        focusMode: 'continuous', // Continuous autofocus
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    }
+                };
+                
+                // Add camera optimization constraints if enabled
+                if (document.getElementById('cameraOptimizationEnabled').checked) {
+                    constraints.video.focusDistance = { ideal: 0.3 }; // Focus on close objects but not macro
+                    constraints.video.zoom = { ideal: 1.0 }; // No zoom
+                    constraints.video.torch = false; // No flash initially
+                }
+                
+                cameraStream = await navigator.mediaDevices.getUserMedia(constraints);
+                showCameraInterface(cameraStream);
+                
+            } catch (error) {
+                console.error('Camera error:', error);
+                showStatusBanner('Camera kon niet worden geopend', 'error');
+                // Fallback to file input
+                document.getElementById('fileInput').click();
+            }
+        }
+        
+        async function takeQuickPhoto() {
+            // Quick single photo without persistent camera
+            document.getElementById('fileInput').click();
+        }
+        
+        function showCameraInterface(stream) {
+            // Create camera modal
+            cameraModal = document.createElement('div');
+            cameraModal.className = 'modal-overlay visible';
+            cameraModal.innerHTML = `
+                <div class="modal-content" style="max-width: 100vw; max-height: 100vh; width: 100%; height: 100%;">
+                    <div class="modal-header">
+                        <div class="modal-title">Continue Shooting</div>
+                        <div style="display: flex; gap: 8px;">
+                            <span class="photo-count-badge" id="photoCountBadge">${selectedFiles.length} foto's</span>
+                            <button class="close-button" onclick="closeCameraInterface()"></button>
+                        </div>
+                    </div>
+                    <div class="modal-body" style="padding: 0; height: calc(100% - 80px); display: flex; flex-direction: column;">
+                        <video id="cameraVideo" autoplay playsinline style="width: 100%; flex: 1; object-fit: cover; background: black;"></video>
+                        <div class="camera-controls">
+                            <button class="capture-button" onclick="capturePhoto()">
+                                <div class="capture-ring">
+                                    <div class="capture-inner"></div>
+                                </div>
+                            </button>
+                            <div class="camera-info">
+                                <div>Tap om foto te maken</div>
+                                <div style="font-size: 12px; opacity: 0.7;">Auto-crop en price check actief</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(cameraModal);
+            
+            const video = cameraModal.querySelector('#cameraVideo');
+            video.srcObject = stream;
+        }
+        
+        function capturePhoto() {
+            const video = document.getElementById('cameraVideo');
+            if (!video) return;
+            
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+            
+            canvas.toBlob((blob) => {
+                const file = new File([blob], `card_${Date.now()}.jpg`, {
+                    type: 'image/jpeg',
+                    lastModified: Date.now()
+                });
+                
+                handleFiles([file]);
+                
+                // Update photo count in camera interface
+                updateCameraPhotoCount();
+                
+                // Show capture feedback
+                showCaptureAnimation();
+                
+            }, 'image/jpeg', 0.95);
+        }
+        
+        function updateCameraPhotoCount() {
+            const badge = document.getElementById('photoCountBadge');
+            if (badge) {
+                badge.textContent = `${selectedFiles.length} foto's`;
+            }
+        }
+        
+        function showCaptureAnimation() {
+            const video = document.getElementById('cameraVideo');
+            if (video) {
+                video.style.filter = 'brightness(1.5)';
+                setTimeout(() => {
+                    video.style.filter = 'none';
+                }, 150);
+            }
+            
+            // Haptic feedback simulation
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+        }
+        
+        function closeCameraInterface() {
+            if (cameraModal) {
+                // Stop camera stream
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(track => track.stop());
+                    cameraStream = null;
+                }
+                cameraModal.remove();
+                cameraModal = null;
+            }
+        }
+        
+        // Update file input based on camera optimization setting
+        function updateCameraInput() {
+            const fileInput = document.getElementById('fileInput');
+            const cameraButton = document.querySelector('.camera-button');
+            const optimizationEnabled = document.getElementById('cameraOptimizationEnabled').checked;
+            
+            if (optimizationEnabled && navigator.mediaDevices) {
+                // Show optimized camera button
+                cameraButton.style.display = 'block';
+                fileInput.setAttribute('capture', 'environment');
+            } else {
+                // Hide optimized camera button
+                cameraButton.style.display = 'none';
+                fileInput.setAttribute('capture', 'environment');
+            }
+        }
+        
+        // Test price check webhook
+        async function testPriceCheckWebhook() {
+            const priceCheckUrl = document.getElementById('priceCheckUrl').value.trim();
+            
+            if (!priceCheckUrl) {
+                showStatusBanner('Voer eerst een Price Check URL in', 'error');
+                return;
+            }
+            
+            if (!isValidUrl(priceCheckUrl)) {
+                showStatusBanner('Ongeldige Price Check URL', 'error');
+                return;
+            }
+            
+            try {
+                showStatusBanner('Price Check webhook testen...', 'loading');
+                
+                const formData = new FormData();
+                formData.append('test', 'true');
+                formData.append('message', 'Test vanuit Card Uploader Pro');
+                formData.append('timestamp', new Date().toISOString());
+                
+                const response = await fetch(priceCheckUrl, {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                if (response.ok) {
+                    showStatusBanner('Price Check webhook werkt perfect!', 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+            } catch (error) {
+                console.error('Price check test error:', error);
+                showStatusBanner(`Webhook test mislukt: ${error.message}`, 'error');
+            }
         }
         
         * {
@@ -116,6 +523,7 @@
             transform: scale(0.8);
             transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
             box-shadow: var(--shadow-large);
+            max-width: 280px;
         }
         
         .island-pill.show {
@@ -155,10 +563,15 @@
             letter-spacing: -0.41px;
         }
         
-        .settings-button {
+        .nav-actions {
             position: absolute;
             top: 17px;
             right: 0;
+            display: flex;
+            gap: 8px;
+        }
+        
+        .action-button {
             width: 44px;
             height: 44px;
             background: var(--fill-tertiary);
@@ -171,23 +584,56 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            position: relative;
         }
         
-        .settings-button:hover {
+        .action-button:hover {
             background: var(--fill-secondary);
             transform: scale(1.05);
         }
         
-        .settings-button:active {
+        .action-button:active {
             transform: scale(0.95);
         }
         
-        .settings-icon {
+        .action-icon {
             width: 18px;
             height: 18px;
             background: currentColor;
-            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E") center/contain no-repeat;
-            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E") center/contain no-repeat;
+            mask-size: contain;
+            mask-repeat: no-repeat;
+            mask-position: center;
+            -webkit-mask-size: contain;
+            -webkit-mask-repeat: no-repeat;
+            -webkit-mask-position: center;
+        }
+        
+        .icon-settings {
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E");
+            -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z'/%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M15 12a3 3 0 11-6 0 3 3 0 016 0z'/%3E%3C/svg%3E");
+        }
+        
+        .icon-templates {
+            mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'/%3E%3C/svg%3E");
+            -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z'/%3E%3C/svg%3E");
+        }
+        
+        .photo-counter {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: var(--ios-red);
+            color: white;
+            border-radius: 12px;
+            min-width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(255, 69, 58, 0.3);
+            border: 2px solid var(--background-primary);
         }
         
         /* Sections */
@@ -198,6 +644,9 @@
         .section-header {
             padding: 0 4px 8px;
             margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         
         .section-title {
@@ -207,6 +656,46 @@
             text-transform: uppercase;
             letter-spacing: -0.08px;
             line-height: 1.3;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .price-check-status {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: none;
+            background: var(--fill-tertiary);
+            padding: 2px 8px;
+            border-radius: 12px;
+            border: 1px solid var(--separator-non-opaque);
+        }
+        
+        .section-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .mini-button {
+            padding: 4px 8px;
+            background: var(--fill-tertiary);
+            border: none;
+            border-radius: 6px;
+            color: var(--ios-blue);
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .mini-button:hover {
+            background: var(--fill-secondary);
+        }
+        
+        .mini-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
         
         /* Cards */
@@ -247,61 +736,6 @@
         
         .card-row:active {
             background: var(--fill-quaternary);
-        }
-        
-        /* Settings Card */
-        .settings-panel {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(20px);
-            z-index: 999;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
-        }
-        
-        .settings-panel.visible {
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        .settings-content {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            background: var(--surface-elevated);
-            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-            padding: 12px 16px calc(env(safe-area-inset-bottom) + 16px);
-            transform: translateY(100%);
-            transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
-            backdrop-filter: saturate(180%) blur(20px);
-            border-top: 0.5px solid var(--separator-non-opaque);
-        }
-        
-        .settings-panel.visible .settings-content {
-            transform: translateY(0);
-        }
-        
-        .settings-handle {
-            width: 36px;
-            height: 5px;
-            background: var(--system-gray4);
-            border-radius: 2.5px;
-            margin: 0 auto 20px;
-        }
-        
-        .settings-title {
-            font-size: 20px;
-            font-weight: 600;
-            color: var(--text-primary);
-            text-align: center;
-            margin-bottom: 24px;
-            letter-spacing: -0.45px;
         }
         
         /* Upload Zone */
@@ -427,6 +861,7 @@
             background: var(--fill-secondary);
             box-shadow: var(--shadow-small);
             transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            cursor: pointer;
         }
         
         .preview-item:hover {
@@ -434,10 +869,49 @@
             box-shadow: var(--shadow-medium);
         }
         
+        .preview-item.selected {
+            box-shadow: 0 0 0 3px var(--ios-blue);
+        }
+        
+        .preview-item.dragging {
+            opacity: 0.5;
+            transform: scale(1.1) rotate(5deg);
+        }
+        
         .preview-image {
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+        
+        .preview-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .preview-item:hover .preview-overlay {
+            opacity: 1;
+        }
+        
+        .preview-info {
+            position: absolute;
+            bottom: 4px;
+            left: 4px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            backdrop-filter: blur(10px);
         }
         
         .remove-button {
@@ -477,10 +951,175 @@
             -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E") center/contain no-repeat;
         }
         
+        .reorder-handle {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            width: 24px;
+            height: 24px;
+            border-radius: 12px;
+            background: rgba(0, 0, 0, 0.8);
+            border: none;
+            color: white;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            opacity: 0;
+        }
+        
+        .preview-item:hover .reorder-handle {
+            opacity: 1;
+        }
+        
+        .reorder-handle:active {
+            cursor: grabbing;
+        }
+        
+        .reorder-handle::before {
+            content: '';
+            width: 12px;
+            height: 12px;
+            background: currentColor;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 8h16M4 16h16'/%3E%3C/svg%3E") center/contain no-repeat;
+            -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M4 8h16M4 16h16'/%3E%3C/svg%3E") center/contain no-repeat;
+        }
+        
+        .price-check-button {
+            position: absolute;
+            bottom: 6px;
+            right: 6px;
+            width: 28px;
+            height: 28px;
+            border-radius: 14px;
+            background: rgba(255, 215, 10, 0.9);
+            border: none;
+            color: #000;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            opacity: 0;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .preview-item:hover .price-check-button {
+            opacity: 1;
+        }
+        
+        .price-check-button:hover {
+            background: var(--ios-yellow);
+            transform: scale(1.1);
+        }
+        
+        .crop-button {
+            position: absolute;
+            bottom: 6px;
+            left: 6px;
+            width: 28px;
+            height: 28px;
+            border-radius: 14px;
+            background: rgba(0, 122, 255, 0.9);
+            border: none;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+            opacity: 0;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        
+        .preview-item:hover .crop-button {
+            opacity: 1;
+        }
+        
+        .crop-button:hover {
+            background: var(--ios-blue);
+            transform: scale(1.1);
+        }
+        
+        /* Progress bars */
+        .progress-container {
+            margin: 16px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .progress-container.show {
+            opacity: 1;
+        }
+        
+        .progress-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 0.5px solid var(--separator-non-opaque);
+        }
+        
+        .progress-item:last-child {
+            border-bottom: none;
+        }
+        
+        .progress-thumb {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            object-fit: cover;
+            background: var(--fill-secondary);
+        }
+        
+        .progress-info {
+            flex: 1;
+            min-width: 0;
+        }
+        
+        .progress-name {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--text-primary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: var(--fill-secondary);
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--ios-blue), var(--ios-purple));
+            border-radius: 2px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .progress-status {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+        
         /* Form Fields */
         .form-field {
             display: flex;
             flex-direction: column;
+            position: relative;
         }
         
         .field-label {
@@ -489,6 +1128,23 @@
             color: var(--text-primary);
             margin-bottom: 8px;
             letter-spacing: -0.41px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .field-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .template-button {
+            font-size: 13px;
+            color: var(--ios-blue);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
         }
         
         .text-input, .url-input, .number-input {
@@ -520,6 +1176,17 @@
             line-height: 1.47059;
         }
         
+        .character-counter {
+            position: absolute;
+            bottom: 8px;
+            right: 12px;
+            font-size: 12px;
+            color: var(--text-tertiary);
+            background: var(--background-secondary);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+        
         .price-field {
             position: relative;
         }
@@ -541,6 +1208,69 @@
             padding-left: 36px;
             text-align: right;
             font-weight: 600;
+        }
+        
+        /* Camera interface styles */
+        .photo-count-badge {
+            background: var(--fill-tertiary);
+            color: var(--text-primary);
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 14px;
+            font-weight: 600;
+            border: 0.5px solid var(--separator-non-opaque);
+        }
+        
+        .camera-controls {
+            padding: 30px 20px calc(env(safe-area-inset-bottom) + 20px);
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(20px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .capture-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            transition: transform 0.1s ease;
+        }
+        
+        .capture-button:active {
+            transform: scale(0.95);
+        }
+        
+        .capture-ring {
+            width: 80px;
+            height: 80px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        .capture-inner {
+            width: 60px;
+            height: 60px;
+            background: white;
+            border-radius: 50%;
+            transition: all 0.1s ease;
+        }
+        
+        .capture-button:active .capture-inner {
+            transform: scale(0.9);
+        }
+        
+        .camera-info {
+            text-align: center;
+            color: white;
+            font-size: 14px;
+            font-weight: 500;
         }
         
         /* Buttons */
@@ -594,10 +1324,63 @@
             box-shadow: none;
         }
         
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(20px);
+            z-index: 1999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal-content {
+            background: var(--surface-elevated);
+            border-radius: var(--radius-xl);
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow: hidden;
+            transform: scale(0.9);
+            transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+            backdrop-filter: saturate(180%) blur(20px);
+            border: 0.5px solid var(--separator-non-opaque);
+            box-shadow: var(--shadow-xl);
+        }
+        
+        .modal-overlay.visible .modal-content {
+            transform: scale(1);
+        }
+        
+        .modal-header {
+            padding: 20px 20px 16px;
+            border-bottom: 0.5px solid var(--separator-non-opaque);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.45px;
+        }
+        
         .close-button {
-            position: absolute;
-            top: 16px;
-            right: 16px;
             width: 32px;
             height: 32px;
             border-radius: 16px;
@@ -622,6 +1405,175 @@
             background: currentColor;
             mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E") center/contain no-repeat;
             -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M6 18L18 6M6 6l12 12'/%3E%3C/svg%3E") center/contain no-repeat;
+        }
+        
+        .modal-body {
+            padding: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .photo-viewer {
+            text-align: center;
+        }
+        
+        .photo-viewer img {
+            max-width: 100%;
+            max-height: 60vh;
+            border-radius: var(--radius-medium);
+            box-shadow: var(--shadow-medium);
+        }
+        
+        .photo-meta {
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--fill-secondary);
+            border-radius: var(--radius-medium);
+            text-align: left;
+        }
+        
+        .meta-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .meta-label {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        .meta-value {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        
+        /* Settings Panel */
+        .settings-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(20px);
+            z-index: 999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+        }
+        
+        .settings-panel.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .settings-content {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--surface-elevated);
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+            padding: 12px 16px calc(env(safe-area-inset-bottom) + 16px);
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+            backdrop-filter: saturate(180%) blur(20px);
+            border-top: 0.5px solid var(--separator-non-opaque);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .settings-panel.visible .settings-content {
+            transform: translateY(0);
+        }
+        
+        .settings-handle {
+            width: 36px;
+            height: 5px;
+            background: var(--system-gray4);
+            border-radius: 2.5px;
+            margin: 0 auto 20px;
+        }
+        
+        .settings-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: center;
+            margin-bottom: 24px;
+            letter-spacing: -0.45px;
+        }
+        
+        /* Templates Panel */
+        .templates-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            backdrop-filter: blur(20px);
+            z-index: 998;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+        }
+        
+        .templates-panel.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .templates-content {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--surface-elevated);
+            border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+            padding: 12px 16px calc(env(safe-area-inset-bottom) + 16px);
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1);
+            backdrop-filter: saturate(180%) blur(20px);
+            border-top: 0.5px solid var(--separator-non-opaque);
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .templates-panel.visible .templates-content {
+            transform: translateY(0);
+        }
+        
+        .template-item {
+            padding: 16px;
+            background: var(--fill-secondary);
+            border-radius: var(--radius-medium);
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .template-item:hover {
+            background: var(--fill-tertiary);
+            transform: translateY(-1px);
+        }
+        
+        .template-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        
+        .template-preview {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            max-height: 40px;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         /* Status Messages */
@@ -683,25 +1635,6 @@
             to { transform: rotate(360deg); }
         }
         
-        /* Photo counter badge */
-        .photo-counter {
-            position: absolute;
-            top: -8px;
-            right: -8px;
-            background: var(--ios-red);
-            color: white;
-            border-radius: 12px;
-            min-width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            font-weight: 600;
-            box-shadow: 0 2px 8px rgba(255, 69, 58, 0.3);
-            border: 2px solid var(--background-primary);
-        }
-        
         /* Enhanced iOS animations */
         @keyframes slideUp {
             from {
@@ -725,12 +1658,21 @@
             }
         }
         
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
         .animate-slide-up {
             animation: slideUp 0.3s cubic-bezier(0.2, 0, 0, 1);
         }
         
         .animate-scale-in {
             animation: scaleIn 0.2s cubic-bezier(0.2, 0, 0, 1);
+        }
+        
+        .animate-pulse {
+            animation: pulse 1s ease-in-out infinite;
         }
         
         /* iOS specific enhancements */
@@ -744,7 +1686,7 @@
                 -webkit-appearance: none;
             }
             
-            .settings-content {
+            .settings-content, .templates-content {
                 padding-bottom: calc(env(safe-area-inset-bottom) + 24px);
             }
         }
@@ -757,6 +1699,10 @@
             
             .nav-large-title {
                 font-size: 28px;
+            }
+            
+            .preview-grid {
+                grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
             }
         }
         
@@ -773,6 +1719,29 @@
         .no-zoom {
             touch-action: manipulation;
         }
+        
+        /* Auto-save indicator */
+        .auto-save-indicator {
+            position: fixed;
+            top: calc(env(safe-area-inset-top) + 100px);
+            right: 16px;
+            background: rgba(48, 209, 88, 0.9);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transform: translateX(100px);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .auto-save-indicator.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
     </style>
 </head>
 <body class="no-zoom">
@@ -784,19 +1753,28 @@
         </div>
     </div>
 
+    <div class="auto-save-indicator" id="autoSaveIndicator">
+        ✓ Auto-saved
+    </div>
+
     <div class="app-container">
         <div class="navigation-header">
             <h1 class="nav-large-title">Card Uploader</h1>
-            <p class="nav-subtitle">Professional eBay listing tool</p>
-            <button class="settings-button haptic" onclick="toggleSettings()">
-                <span class="settings-icon"></span>
-                <div class="photo-counter" id="photoCounter" style="display: none;">0</div>
-            </button>
+            <p class="nav-subtitle">Upload je kaarten naar eBay</p>
+            <div class="nav-actions">
+                <button class="action-button haptic" onclick="toggleSettings()" title="Settings">
+                    <div class="action-icon icon-settings"></div>
+                    <div class="photo-counter" id="photoCounter" style="display: none;">0</div>
+                </button>
+            </div>
         </div>
         
         <div class="section-group upload-section">
             <div class="section-header">
                 <h2 class="section-title">Photos</h2>
+                <div class="section-actions">
+                    <button class="mini-button" onclick="clearAllPhotos()" id="clearAllBtn" disabled>Wissen</button>
+                </div>
             </div>
             <div class="card card-elevated animate-slide-up">
                 <div class="upload-zone haptic" onclick="document.getElementById('fileInput').click()" 
@@ -804,33 +1782,47 @@
                     <div class="upload-icon-container">
                         <div class="upload-icon"></div>
                     </div>
-                    <div class="upload-text">Add Photos</div>
-                    <div class="upload-subtext">Tap to select or drag and drop</div>
+                    <div class="upload-text">Voeg foto's toe</div>
+                    <div class="upload-subtext">Sleep bestanden of klik om te selecteren</div>
                 </div>
                 
                 <input type="file" id="fileInput" accept="image/*" multiple capture="environment">
+                
+                <!-- Simplified camera interface -->
+                <div class="camera-actions" style="margin-top: 16px;">
+                    <button class="primary-button haptic" onclick="openOptimizedCamera()" 
+                            style="width: 100%; margin: 0; padding: 16px;">
+                        Start Camera
+                    </button>
+                </div>
             </div>
             
             <div class="preview-section" id="previewSection" style="display: none;">
                 <div class="preview-grid" id="previewContainer"></div>
             </div>
+            
+            <div class="progress-container" id="progressContainer">
+                <!-- Progress items will be added here -->
+            </div>
         </div>
         
         <div class="section-group">
             <div class="section-header">
-                <h2 class="section-title">Listing Details</h2>
+                <h2 class="section-title">Details</h2>
             </div>
             <div class="card animate-slide-up">
                 <div class="card-row">
                     <div class="form-field">
-                        <label class="field-label">Description</label>
+                        <label class="field-label">Beschrijving</label>
                         <textarea id="description" class="text-input" 
-                                  placeholder="Describe your cards... (condition, set, special features)"></textarea>
+                                  placeholder="Beschrijf je kaart..."
+                                  maxlength="500"></textarea>
+                        <div class="character-counter" id="descriptionCounter">0/500</div>
                     </div>
                 </div>
                 <div class="card-row">
                     <div class="form-field">
-                        <label class="field-label">Price</label>
+                        <label class="field-label">Prijs</label>
                         <div class="price-field">
                             <input type="number" id="price" class="number-input" 
                                    placeholder="0.00" step="0.01" min="0">
@@ -841,22 +1833,95 @@
         </div>
         
         <button class="primary-button haptic" onclick="uploadCards()" id="uploadBtn">
-            Upload to eBay
+            Upload naar eBay
         </button>
+    </div>
+
+    <!-- Photo Viewer Modal -->
+    <div class="modal-overlay" id="photoModal" onclick="closePhotoModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title" id="photoModalTitle">Foto Preview</div>
+                <button class="close-button" onclick="closePhotoModal()"></button>
+            </div>
+            <div class="modal-body">
+                <div class="photo-viewer">
+                    <img id="photoModalImage" src="" alt="Preview">
+                    <div class="photo-meta" id="photoModalMeta">
+                        <!-- Meta info will be added here -->
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Settings Panel -->
     <div class="settings-panel" id="settingsPanel" onclick="closeSettings(event)">
         <div class="settings-content" onclick="event.stopPropagation()">
             <div class="settings-handle"></div>
-            <button class="close-button" onclick="closeSettings()"></button>
-            <h2 class="settings-title">Webhook Settings</h2>
+            <h2 class="settings-title">Instellingen</h2>
             
             <div class="form-field">
                 <label class="field-label">N8N Webhook URL</label>
                 <input type="url" id="webhookUrl" class="url-input" 
                        placeholder="https://your-n8n-server.com/webhook/cards"
                        value="https://labgrowns.nl/webhook/60406624-b200-493c-aaf3-23f068a09829">
+            </div>
+            
+            <div class="form-field" style="margin-top: 20px;">
+                <label class="field-label">Compressie kwaliteit</label>
+                <input type="range" id="compressionQuality" min="0.3" max="1.0" step="0.1" value="0.8" 
+                       style="width: 100%; margin-top: 8px;" oninput="updateCompressionDisplay()">
+                <div style="font-size: 14px; color: var(--text-secondary); margin-top: 4px;" id="compressionDisplay">
+                    Hoog (80%)
+                </div>
+            </div>
+            
+            <div class="form-field" style="margin-top: 20px;">
+                <label class="field-label">Price Check Webhook URL</label>
+                <input type="url" id="priceCheckUrl" class="url-input" 
+                       placeholder="https://your-n8n-server.com/webhook/pricecheck"
+                       value="https://labgrowns.nl/webhook-test/63ce1602-efe3-4d49-bae6-14f3717ce028">
+                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+                    Voor automatische Google Image Search + PriceCharting
+                </div>
+            </div>
+            
+            <div style="margin-top: 16px; padding: 12px; background: var(--fill-secondary); border-radius: var(--radius-medium);">
+                <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); margin-bottom: 8px;">Price Check Setup</div>
+                <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.4;">
+                    1. Maak een N8N workflow die POST ontvangt<br>
+                    2. Gebruik de 'image' parameter voor de foto<br>
+                    3. Open browser met: https://www.google.com/search?tbm=isch&q=[extracted_text]+pricecharting<br>
+                    4. Schakel auto price check in onderstaand
+                </div>
+            </div>
+            
+            <div class="form-field" style="margin-top: 20px;">
+                <label class="field-label">
+                    <span>Auto-bijsnijden kaarten</span>
+                    <input type="checkbox" id="autoCropEnabled" checked style="margin-left: 10px;">
+                </label>
+                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+                    Detecteert en snijdt kaarten automatisch bij
+                </div>
+            </div>
+            
+            <div class="form-field" style="margin-top: 20px;">
+                <label class="field-label">
+                    <span>Camera optimalisatie</span>
+                    <input type="checkbox" id="cameraOptimizationEnabled" checked style="margin-left: 10px;">
+                </label>
+                <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+                    Schakel macro uit, gebruik betere focus voor kaarten
+                </div>
+            </div>
+            
+            <div class="form-field" style="margin-top: 20px;">
+                <label class="field-label">
+                    <span>Auto-save concepten</span>
+                    <input type="checkbox" id="autoSaveEnabled" checked style="margin-left: 10px;">
+                </label>
             </div>
         </div>
     </div>
@@ -868,7 +1933,13 @@
 
     <script>
         let selectedFiles = [];
+        let selectedPhotoIds = new Set();
         let uploadInProgress = false;
+        let draggedIndex = null;
+        let autoSaveTimeout = null;
+        
+        // Default templates (empty by default)
+        const defaultTemplates = [];
         
         // PWA Service Worker Registration
         if ('serviceWorker' in navigator) {
@@ -879,24 +1950,161 @@
         
         // Initialize app
         document.addEventListener('DOMContentLoaded', () => {
+            loadSettings();
+            loadDraft();
+            updateUploadButton();
+            updateCharacterCounter('description');
+            showDynamicIsland('Klaar om te uploaden', 'success');
+            
+            // Auto-save setup
+            document.getElementById('description').addEventListener('input', scheduleAutoSave);
+            document.getElementById('price').addEventListener('input', scheduleAutoSave);
+        });
+        
+        // Settings functions
+        function loadSettings() {
             const savedUrl = localStorage.getItem('webhookUrl');
+            const savedPriceCheckUrl = localStorage.getItem('priceCheckUrl');
+            
             if (savedUrl) {
                 document.getElementById('webhookUrl').value = savedUrl;
             }
-            updateUploadButton();
-            showDynamicIsland('Ready to upload', 'success');
-        });
+            if (savedPriceCheckUrl) {
+                document.getElementById('priceCheckUrl').value = savedPriceCheckUrl;
+            }
+        }
         
-        // Save webhook URL
-        document.getElementById('webhookUrl').addEventListener('change', (e) => {
-            localStorage.setItem('webhookUrl', e.target.value);
-            showDynamicIsland('Settings saved', 'success');
-        });
+        function saveSettings() {
+            localStorage.setItem('webhookUrl', document.getElementById('webhookUrl').value);
+            localStorage.setItem('priceCheckUrl', document.getElementById('priceCheckUrl').value);
+        }
+        
+        function updatePriceCheckStatus() {
+            const statusEl = document.getElementById('priceCheckStatus');
+            const autoPriceCheckEnabled = document.getElementById('autoPriceCheckEnabled').checked;
+            const priceCheckUrl = document.getElementById('priceCheckUrl').value.trim();
+            
+            if (autoPriceCheckEnabled && priceCheckUrl && isValidUrl(priceCheckUrl)) {
+                statusEl.style.display = 'inline-block';
+            } else {
+                statusEl.style.display = 'none';
+            }
+        }
+        
+        function updateCompressionDisplay() {
+            const quality = document.getElementById('compressionQuality').value;
+            const percentage = Math.round(quality * 100);
+            let level = 'Laag';
+            if (percentage >= 80) level = 'Hoog';
+            else if (percentage >= 60) level = 'Medium';
+            
+            document.getElementById('compressionDisplay').textContent = `${level} (${percentage}%)`;
+        }
+        
+        // Auto-save functions
+        function scheduleAutoSave() {
+            if (!document.getElementById('autoSaveEnabled').checked) return;
+            
+            clearTimeout(autoSaveTimeout);
+            autoSaveTimeout = setTimeout(() => {
+                saveDraft();
+                showAutoSaveIndicator();
+            }, 2000);
+        }
+        
+        function saveDraft() {
+            const draft = {
+                description: document.getElementById('description').value,
+                price: document.getElementById('price').value,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('cardUploadDraft', JSON.stringify(draft));
+        }
+        
+        function loadDraft() {
+            // Start with empty fields - no auto-loading of drafts
+            document.getElementById('description').value = '';
+            document.getElementById('price').value = '';
+            updateCharacterCounter('description');
+        }
+        
+        function showAutoSaveIndicator() {
+            const indicator = document.getElementById('autoSaveIndicator');
+            indicator.classList.add('show');
+            setTimeout(() => {
+                indicator.classList.remove('show');
+            }, 2000);
+        }
+        
+        // Templates functions
+        function loadTemplates() {
+            let templates = JSON.parse(localStorage.getItem('descriptionTemplates') || '[]');
+            // Don't load default templates - start with empty list
+            updateTemplatesList(templates);
+        }
+        
+        function updateTemplatesList(templates) {
+            const container = document.getElementById('templatesList');
+            container.innerHTML = '';
+            
+            if (templates.length === 0) {
+                const emptyState = document.createElement('div');
+                emptyState.style.cssText = `
+                    text-align: center;
+                    padding: 40px 20px;
+                    color: var(--text-secondary);
+                    font-size: 15px;
+                `;
+                emptyState.innerHTML = `
+                    <div style="margin-bottom: 12px; font-size: 18px; color: var(--text-tertiary);">•••</div>
+                    <div>Geen templates gevonden</div>
+                    <div style="font-size: 13px; margin-top: 8px;">Voer een beschrijving in en sla deze op als template</div>
+                `;
+                container.appendChild(emptyState);
+                return;
+            }
+            
+            templates.forEach((template, index) => {
+                const item = document.createElement('div');
+                item.className = 'template-item';
+                item.innerHTML = `
+                    <div class="template-name">${template.name}</div>
+                    <div class="template-preview">${template.content.substring(0, 100)}...</div>
+                `;
+                item.onclick = () => useTemplate(template.content);
+                container.appendChild(item);
+            });
+        }
+        
+        function useTemplate(content) {
+            document.getElementById('description').value = content;
+            updateCharacterCounter('description');
+            closeTemplates();
+            showStatusBanner('Template toegepast', 'success');
+            scheduleAutoSave();
+        }
+        
+        function saveCurrentAsTemplate() {
+            const description = document.getElementById('description').value.trim();
+            if (!description) {
+                showStatusBanner('Voer eerst een beschrijving in', 'error');
+                return;
+            }
+            
+            const name = prompt('Geef deze template een naam:');
+            if (!name) return;
+            
+            const templates = JSON.parse(localStorage.getItem('descriptionTemplates') || '[]');
+            templates.push({ name: name.trim(), content: description });
+            localStorage.setItem('descriptionTemplates', JSON.stringify(templates));
+            
+            updateTemplatesList(templates);
+            showStatusBanner('Template opgeslagen', 'success');
+        }
         
         // Dynamic Island functions
         function showDynamicIsland(text, type = 'info') {
             const island = document.getElementById('dynamicIsland');
-            const content = document.getElementById('islandContent');
             const textEl = document.getElementById('islandText');
             
             textEl.textContent = text;
@@ -904,10 +2112,10 @@
             
             setTimeout(() => {
                 island.classList.remove('show');
-            }, 2000);
+            }, 3000);
         }
         
-        // Settings functions
+        // Panel functions
         function toggleSettings() {
             const panel = document.getElementById('settingsPanel');
             panel.classList.add('visible');
@@ -917,6 +2125,119 @@
             if (event && event.target !== event.currentTarget) return;
             const panel = document.getElementById('settingsPanel');
             panel.classList.remove('visible');
+            saveSettings();
+        }
+        
+        function toggleTemplates() {
+            const panel = document.getElementById('templatesPanel');
+            panel.classList.add('visible');
+        }
+        
+        function closeTemplates(event) {
+            if (event && event.target !== event.currentTarget) return;
+            const panel = document.getElementById('templatesPanel');
+            panel.classList.remove('visible');
+        }
+        
+        // Photo modal functions
+        function openPhotoModal(file, index) {
+            const modal = document.getElementById('photoModal');
+            const img = document.getElementById('photoModalImage');
+            const title = document.getElementById('photoModalTitle');
+            const meta = document.getElementById('photoModalMeta');
+            
+            title.textContent = `Foto ${index + 1} van ${selectedFiles.length}`;
+            img.src = URL.createObjectURL(file);
+            
+            // Show metadata
+            const sizeKB = Math.round(file.size / 1024);
+            meta.innerHTML = `
+                <div class="meta-row">
+                    <span class="meta-label">Bestandsnaam:</span>
+                    <span class="meta-value">${file.name}</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">Grootte:</span>
+                    <span class="meta-value">${sizeKB} KB</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">Type:</span>
+                    <span class="meta-value">${file.type}</span>
+                </div>
+                <div class="meta-row">
+                    <span class="meta-label">Laatst gewijzigd:</span>
+                    <span class="meta-value">${new Date(file.lastModified).toLocaleDateString('nl-NL')}</span>
+                </div>
+            `;
+            
+            modal.classList.add('visible');
+        }
+        
+        function closePhotoModal(event) {
+            if (event && event.target !== event.currentTarget) return;
+            const modal = document.getElementById('photoModal');
+            modal.classList.remove('visible');
+        }
+        
+        // Character counter
+        function updateCharacterCounter(fieldId) {
+            const field = document.getElementById(fieldId);
+            const counter = document.getElementById(fieldId + 'Counter');
+            if (field && counter) {
+                const maxLength = field.getAttribute('maxlength') || '∞';
+                counter.textContent = `${field.value.length}/${maxLength}`;
+            }
+        }
+        
+        // Quick price buttons
+        function setQuickPrice(price) {
+            document.getElementById('price').value = price.toFixed(2);
+            scheduleAutoSave();
+            showStatusBanner(`Prijs ingesteld op €${price.toFixed(2)}`, 'success');
+        }
+        
+        // Photo selection functions
+        function selectAllPhotos() {
+            selectedPhotoIds.clear();
+            selectedFiles.forEach((_, index) => selectedPhotoIds.add(index));
+            updatePreview();
+            updatePhotoButtons();
+        }
+        
+        function removeSelectedPhotos() {
+            if (selectedPhotoIds.size === 0) return;
+            
+            const indicesToRemove = Array.from(selectedPhotoIds).sort((a, b) => b - a);
+            indicesToRemove.forEach(index => {
+                selectedFiles.splice(index, 1);
+            });
+            
+            selectedPhotoIds.clear();
+            updatePreview();
+            updatePhotoCounter();
+            updatePhotoButtons();
+            
+            showStatusBanner(`${indicesToRemove.length} foto's verwijderd`, 'success');
+        }
+        
+        function clearAllPhotos() {
+            if (selectedFiles.length === 0) return;
+            
+            if (confirm('Weet je zeker dat je alle foto\'s wilt verwijderen?')) {
+                selectedFiles = [];
+                selectedPhotoIds.clear();
+                updatePreview();
+                updatePhotoCounter();
+                updatePhotoButtons();
+                document.getElementById('fileInput').value = '';
+                showStatusBanner('Alle foto\'s verwijderd', 'success');
+                showDynamicIsland('Klaar om te uploaden', 'info');
+            }
+        }
+        
+        function updatePhotoButtons() {
+            const hasPhotos = selectedFiles.length > 0;
+            document.getElementById('clearAllBtn').disabled = !hasPhotos;
         }
         
         // File handling
@@ -943,50 +2264,139 @@
         async function handleFiles(files) {
             if (uploadInProgress) return;
             
-            showStatusBanner('Processing photos...', 'loading');
+            showStatusBanner('Foto\'s verwerken...', 'loading');
+            showProgressContainer(true);
             
             const validFiles = Array.from(files).filter(file => {
                 if (!file.type.startsWith('image/')) {
-                    showStatusBanner(`${file.name} is not a valid image`, 'error');
+                    showStatusBanner(`${file.name} is geen geldige afbeelding`, 'error');
                     return false;
                 }
                 if (file.size > 50 * 1024 * 1024) {
-                    showStatusBanner(`${file.name} is too large (max 50MB)`, 'error');
+                    showStatusBanner(`${file.name} is te groot (max 50MB)`, 'error');
                     return false;
                 }
                 return true;
             });
             
+            const progressContainer = document.getElementById('progressContainer');
+            progressContainer.innerHTML = '';
+            
             const compressedFiles = [];
-            for (const file of validFiles) {
+            for (let i = 0; i < validFiles.length; i++) {
+                const file = validFiles[i];
+                
+                // Add progress item
+                const progressItem = createProgressItem(file, i);
+                progressContainer.appendChild(progressItem);
+                
                 try {
-                    const compressed = await compressImage(file);
+                    updateProgress(i, 0, 'Verwerken...');
+                    let processedFile = file;
+                    
+                    // Auto crop always enabled
+                    updateProgress(i, 20, 'Bijsnijden...');
+                    processedFile = await autoCropCard(processedFile, (progress) => {
+                        updateProgress(i, 20 + progress * 30, 'Bijsnijden...');
+                    });
+                    
+                    updateProgress(i, 50, 'Comprimeren...');
+                    const compressed = await compressImage(processedFile, (progress) => {
+                        updateProgress(i, 50 + progress * 50, 'Comprimeren...');
+                    });
+                    
+                    updateProgress(i, 100, 'Voltooid');
                     compressedFiles.push(compressed);
                 } catch (error) {
                     console.error('Compression error:', error);
+                    updateProgress(i, 100, 'Fout opgetreden');
                     compressedFiles.push(file);
                 }
             }
             
             selectedFiles = [...selectedFiles, ...compressedFiles];
-            updatePreview();
-            updatePhotoCounter();
             
-            if (compressedFiles.length > 0) {
-                const totalSize = compressedFiles.reduce((sum, file) => sum + file.size, 0);
-                const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(1);
-                showStatusBanner(`${compressedFiles.length} photo${compressedFiles.length > 1 ? 's' : ''} added (${totalSizeMB}MB)`, 'success');
-                showDynamicIsland(`${selectedFiles.length} photos ready`, 'success');
+            // Auto price check voor eerste foto
+            if (compressedFiles.length > 0 && selectedFiles.length === compressedFiles.length) {
+                // Dit was de eerste upload sessie
+                await performAutoPriceCheck(compressedFiles[0]);
+            }
+            
+            setTimeout(() => {
+                showProgressContainer(false);
+                updatePreview();
+                updatePhotoCounter();
+                updatePhotoButtons();
+                
+                // Update camera interface if open
+                updateCameraPhotoCount();
+                
+                if (compressedFiles.length > 0) {
+                    const totalSize = compressedFiles.reduce((sum, file) => sum + file.size, 0);
+                    const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(1);
+                    showStatusBanner(`${compressedFiles.length} foto${compressedFiles.length > 1 ? '\'s' : ''} toegevoegd (${totalSizeMB}MB)`, 'success');
+                    showDynamicIsland(`${selectedFiles.length} foto's klaar`, 'success');
+                }
+            }, 1000);
+        }
+        
+        function createProgressItem(file, index) {
+            const item = document.createElement('div');
+            item.className = 'progress-item';
+            item.innerHTML = `
+                <div class="progress-thumb"></div>
+                <div class="progress-info">
+                    <div class="progress-name">${file.name}</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progress-${index}"></div>
+                    </div>
+                    <div class="progress-status" id="status-${index}">Wachten...</div>
+                </div>
+            `;
+            
+            // Set thumbnail
+            const thumb = item.querySelector('.progress-thumb');
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                thumb.style.backgroundImage = `url(${e.target.result})`;
+                thumb.style.backgroundSize = 'cover';
+                thumb.style.backgroundPosition = 'center';
+            };
+            reader.readAsDataURL(file);
+            
+            return item;
+        }
+        
+        function updateProgress(index, percentage, status) {
+            const fill = document.getElementById(`progress-${index}`);
+            const statusEl = document.getElementById(`status-${index}`);
+            
+            if (fill) fill.style.width = `${percentage}%`;
+            if (statusEl) statusEl.textContent = status;
+        }
+        
+        function showProgressContainer(show) {
+            const container = document.getElementById('progressContainer');
+            if (show) {
+                container.classList.add('show');
+            } else {
+                container.classList.remove('show');
             }
         }
         
-        function compressImage(file, maxWidth = 1920, maxHeight = 1920, quality = 0.8) {
+        function compressImage(file, onProgress = () => {}) {
             return new Promise((resolve) => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 const img = new Image();
                 
+                const quality = parseFloat(document.getElementById('compressionQuality').value);
+                const maxWidth = 1920;
+                const maxHeight = 1920;
+                
                 img.onload = function() {
+                    onProgress(0.3);
+                    
                     let { width, height } = img;
                     
                     if (width > height) {
@@ -1003,13 +2413,17 @@
                     
                     canvas.width = width;
                     canvas.height = height;
+                    
+                    onProgress(0.6);
                     ctx.drawImage(img, 0, 0, width, height);
                     
+                    onProgress(0.9);
                     canvas.toBlob((blob) => {
                         const compressedFile = new File([blob], file.name, {
                             type: 'image/jpeg',
                             lastModified: Date.now()
                         });
+                        onProgress(1.0);
                         resolve(compressedFile);
                     }, 'image/jpeg', quality);
                 };
@@ -1033,11 +2447,26 @@
             selectedFiles.forEach((file, index) => {
                 const previewDiv = document.createElement('div');
                 previewDiv.className = 'preview-item animate-scale-in';
+                if (selectedPhotoIds.has(index)) {
+                    previewDiv.classList.add('selected');
+                }
                 
                 const img = document.createElement('img');
                 img.className = 'preview-image';
                 img.src = URL.createObjectURL(file);
                 img.alt = `Preview ${index + 1}`;
+                img.onclick = () => openPhotoModal(file, index);
+                
+                const overlay = document.createElement('div');
+                overlay.className = 'preview-overlay';
+                overlay.onclick = (e) => {
+                    e.stopPropagation();
+                    togglePhotoSelection(index);
+                };
+                
+                const info = document.createElement('div');
+                info.className = 'preview-info';
+                info.textContent = `${Math.round(file.size / 1024)}KB`;
                 
                 const removeBtn = document.createElement('button');
                 removeBtn.className = 'remove-button haptic';
@@ -1047,6 +2476,8 @@
                 };
                 
                 previewDiv.appendChild(img);
+                previewDiv.appendChild(overlay);
+                previewDiv.appendChild(info);
                 previewDiv.appendChild(removeBtn);
                 container.appendChild(previewDiv);
             });
@@ -1054,15 +2485,77 @@
             updateUploadButton();
         }
         
+        function togglePhotoSelection(index) {
+            if (selectedPhotoIds.has(index)) {
+                selectedPhotoIds.delete(index);
+            } else {
+                selectedPhotoIds.add(index);
+            }
+            updatePreview();
+            updatePhotoButtons();
+        }
+        
+        // Drag and drop reordering
+        function handleDragStart(e, index) {
+            draggedIndex = index;
+            e.dataTransfer.effectAllowed = 'move';
+            e.target.closest('.preview-item').classList.add('dragging');
+        }
+        
+        function handleDragOver2(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+        
+        function handleDrop2(e, dropIndex) {
+            e.preventDefault();
+            
+            if (draggedIndex === null || draggedIndex === dropIndex) return;
+            
+            // Reorder files
+            const draggedFile = selectedFiles[draggedIndex];
+            selectedFiles.splice(draggedIndex, 1);
+            selectedFiles.splice(dropIndex, 0, draggedFile);
+            
+            // Update selection indices
+            const newSelectedIds = new Set();
+            selectedPhotoIds.forEach(id => {
+                if (id === draggedIndex) {
+                    newSelectedIds.add(dropIndex);
+                } else if (id < draggedIndex && id >= dropIndex) {
+                    newSelectedIds.add(id + 1);
+                } else if (id > draggedIndex && id <= dropIndex) {
+                    newSelectedIds.add(id - 1);
+                } else {
+                    newSelectedIds.add(id);
+                }
+            });
+            selectedPhotoIds = newSelectedIds;
+            
+            draggedIndex = null;
+            updatePreview();
+            showStatusBanner('Foto volgorde aangepast', 'success');
+        }
+        
         function removeFile(index) {
             selectedFiles.splice(index, 1);
+            
+            // Update selection indices
+            const newSelectedIds = new Set();
+            selectedPhotoIds.forEach(id => {
+                if (id < index) newSelectedIds.add(id);
+                else if (id > index) newSelectedIds.add(id - 1);
+            });
+            selectedPhotoIds = newSelectedIds;
+            
             updatePreview();
             updatePhotoCounter();
+            updatePhotoButtons();
             
             if (selectedFiles.length === 0) {
-                showDynamicIsland('Ready to upload', 'info');
+                showDynamicIsland('Klaar om te uploaden', 'info');
             } else {
-                showDynamicIsland(`${selectedFiles.length} photos ready`, 'success');
+                showDynamicIsland(`${selectedFiles.length} foto's klaar`, 'success');
             }
         }
         
@@ -1082,14 +2575,18 @@
             
             if (selectedFiles.length === 0 || !webhookUrl) {
                 btn.disabled = true;
-                btn.textContent = 'Upload to eBay';
+                btn.textContent = 'Upload naar eBay';
             } else {
                 btn.disabled = false;
-                btn.textContent = `Upload ${selectedFiles.length} photo${selectedFiles.length > 1 ? 's' : ''} to eBay`;
+                btn.textContent = `Upload ${selectedFiles.length} foto${selectedFiles.length > 1 ? '\'s' : ''} naar eBay`;
             }
         }
         
+        // Event listeners for auto-save and validation
         document.getElementById('webhookUrl').addEventListener('input', updateUploadButton);
+        document.getElementById('webhookUrl').addEventListener('change', saveSettings);
+        document.getElementById('priceCheckUrl').addEventListener('change', saveSettings);
+        document.getElementById('description').addEventListener('input', () => updateCharacterCounter('description'));
         
         async function uploadCards() {
             if (uploadInProgress) return;
@@ -1099,24 +2596,25 @@
             const price = document.getElementById('price').value;
             
             if (selectedFiles.length === 0) {
-                showStatusBanner('Please select one or more photos first', 'error');
+                showStatusBanner('Selecteer eerst één of meer foto\'s', 'error');
                 return;
             }
             
             if (!webhookUrl) {
-                showStatusBanner('Please enter your N8N webhook URL first', 'error');
+                showStatusBanner('Voer eerst je N8N webhook URL in', 'error');
+                toggleSettings();
                 return;
             }
             
             if (!isValidUrl(webhookUrl)) {
-                showStatusBanner('Please enter a valid webhook URL', 'error');
+                showStatusBanner('Voer een geldige webhook URL in', 'error');
                 return;
             }
             
             uploadInProgress = true;
             updateUploadButton();
-            showStatusBanner('Uploading to eBay...', 'loading');
-            showDynamicIsland('Uploading...', 'loading');
+            showStatusBanner('Uploaden naar eBay...', 'loading');
+            showDynamicIsland('Uploaden...', 'loading');
             
             try {
                 const formData = new FormData();
@@ -1141,21 +2639,27 @@
                 
                 await response.json().catch(() => ({}));
                 
-                showStatusBanner(`${selectedFiles.length} photo${selectedFiles.length > 1 ? 's' : ''} successfully uploaded to eBay!`, 'success');
-                showDynamicIsland('Upload complete!', 'success');
+                showStatusBanner(`${selectedFiles.length} foto${selectedFiles.length > 1 ? '\'s' : ''} succesvol geüpload naar eBay!`, 'success');
+                showDynamicIsland('Upload voltooid!', 'success');
                 
                 // Reset form
                 selectedFiles = [];
+                selectedPhotoIds.clear();
                 document.getElementById('description').value = '';
                 document.getElementById('price').value = '';
                 document.getElementById('fileInput').value = '';
                 updatePreview();
                 updatePhotoCounter();
+                updatePhotoButtons();
+                updateCharacterCounter('description');
+                
+                // Clear draft
+                localStorage.removeItem('cardUploadDraft');
                 
             } catch (error) {
                 console.error('Upload error:', error);
-                showStatusBanner(`Upload failed: ${error.message}`, 'error');
-                showDynamicIsland('Upload failed', 'error');
+                showStatusBanner(`Upload mislukt: ${error.message}`, 'error');
+                showDynamicIsland('Upload mislukt', 'error');
             } finally {
                 uploadInProgress = false;
                 updateUploadButton();
@@ -1179,7 +2683,7 @@
             if (type !== 'loading') {
                 setTimeout(() => {
                     banner.classList.remove('show');
-                }, 3000);
+                }, 4000);
             }
         }
         
@@ -1212,7 +2716,32 @@
         window.addEventListener('orientationchange', updateViewport);
         updateViewport();
         
-        // PWA Install
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch (e.key) {
+                    case 's':
+                        e.preventDefault();
+                        saveDraft();
+                        showAutoSaveIndicator();
+                        break;
+                    case 'a':
+                        if (selectedFiles.length > 0) {
+                            e.preventDefault();
+                            selectAllPhotos();
+                        }
+                        break;
+                }
+            }
+            
+            if (e.key === 'Escape') {
+                closePhotoModal();
+                closeSettings();
+                closeTemplates();
+            }
+        });
+        
+        // PWA Install prompt
         let deferredPrompt;
         
         window.addEventListener('beforeinstallprompt', (e) => {
@@ -1223,7 +2752,7 @@
                 if (deferredPrompt && !window.matchMedia('(display-mode: standalone)').matches) {
                     showInstallPrompt();
                 }
-            }, 3000);
+            }, 5000);
         });
         
         function showInstallPrompt() {
@@ -1231,7 +2760,7 @@
             installBtn.className = 'primary-button';
             installBtn.style.background = 'linear-gradient(135deg, var(--ios-purple), var(--ios-pink))';
             installBtn.style.marginTop = '16px';
-            installBtn.textContent = 'Install App';
+            installBtn.textContent = 'Installeer App';
             installBtn.onclick = installApp;
             
             document.querySelector('.app-container').appendChild(installBtn);
@@ -1244,8 +2773,8 @@
             const result = await deferredPrompt.userChoice;
             
             if (result.outcome === 'accepted') {
-                showStatusBanner('App is being installed...', 'success');
-                showDynamicIsland('Installing app...', 'success');
+                showStatusBanner('App wordt geïnstalleerd...', 'success');
+                showDynamicIsland('App installeren...', 'success');
             }
             
             deferredPrompt = null;
