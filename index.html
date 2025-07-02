@@ -684,8 +684,74 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 16px;
+            gap: 20px;
             z-index: 1001;
+        }
+        
+        .camera-settings {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 12px 20px;
+            border-radius: 25px;
+            backdrop-filter: blur(20px);
+        }
+        
+        .macro-toggle {
+            padding: 8px 16px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            border-radius: 20px;
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .macro-toggle.active {
+            background: var(--ios-red);
+        }
+        
+        .zoom-controls {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .zoom-button {
+            width: 36px;
+            height: 36px;
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .zoom-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .zoom-display {
+            color: white;
+            font-size: 14px;
+            font-weight: 600;
+            min-width: 45px;
+            text-align: center;
+        }
+        
+        .capture-section {
+            display: flex;
+            gap: 24px;
+            align-items: center;
         }
         
         .capture-button {
@@ -934,7 +1000,23 @@
         </div>
         <video class="camera-video" id="cameraVideo" autoplay playsinline></video>
         <div class="camera-controls">
-            <div style="display: flex; gap: 24px; align-items: center;">
+            <!-- Camera Settings -->
+            <div class="camera-settings">
+                <button class="macro-toggle" id="macroToggle" onclick="toggleMacro()">
+                    Macro UIT
+                </button>
+                <div class="zoom-controls">
+                    <button class="zoom-button" onclick="adjustZoom(-0.1)">−</button>
+                    <div class="zoom-display" id="zoomDisplay">1.0x</div>
+                    <button class="zoom-button" onclick="adjustZoom(0.1)">+</button>
+                </div>
+                <button onclick="setZoom(1.7)" style="padding: 6px 12px; background: rgba(255, 255, 255, 0.2); border: none; border-radius: 15px; color: white; font-size: 12px; font-weight: 600; cursor: pointer;">
+                    1.7x
+                </button>
+            </div>
+            
+            <!-- Capture Controls -->
+            <div class="capture-section">
                 <button onclick="closeCamera()" style="background: rgba(255, 255, 255, 0.2); color: white; border: none; padding: 12px 20px; border-radius: 25px; font-weight: 600; cursor: pointer; backdrop-filter: blur(10px);">
                     Sluit Camera
                 </button>
@@ -943,9 +1025,10 @@
                 </button>
                 <div style="width: 120px;"></div> <!-- Spacer for symmetry -->
             </div>
+            
             <div class="camera-info">
                 <div>Tap om foto te maken</div>
-                <div style="font-size: 12px; opacity: 0.7;">Camera blijft open voor meerdere foto's</div>
+                <div style="font-size: 12px; opacity: 0.7;">Gebruik macro en zoom controls hierboven</div>
             </div>
         </div>
     </div>
@@ -959,6 +1042,8 @@
         let selectedFiles = [];
         let cameraStream = null;
         let uploadInProgress = false;
+        let currentZoom = 1.0;
+        let macroEnabled = false;
         
         // Initialize app
         document.addEventListener('DOMContentLoaded', () => {
@@ -989,6 +1074,32 @@
                     const settingsPanel = document.getElementById('settingsPanel');
                     if (settingsPanel.classList.contains('visible')) {
                         closeSettings();
+                    }
+                }
+                
+                // Camera controls (only when camera is open)
+                const cameraModal = document.getElementById('cameraModal');
+                if (cameraModal.classList.contains('visible')) {
+                    switch(e.key) {
+                        case ' ': // Spacebar to capture
+                            e.preventDefault();
+                            capturePhoto();
+                            break;
+                        case 'm': // M to toggle macro
+                        case 'M':
+                            e.preventDefault();
+                            toggleMacro();
+                            break;
+                        case '+': // + to zoom in
+                        case '=':
+                            e.preventDefault();
+                            adjustZoom(0.1);
+                            break;
+                        case '-': // - to zoom out
+                        case '_':
+                            e.preventDefault();
+                            adjustZoom(-0.1);
+                            break;
                     }
                 }
             });
@@ -1051,17 +1162,15 @@
             }
             
             try {
-                // Meer aggressive anti-macro constraints
+                // Start with default constraints (no macro, 1x zoom)
                 const constraints = {
                     video: {
                         facingMode: 'environment',
                         width: { ideal: 1920 },
                         height: { ideal: 1080 },
-                        advanced: [
-                            { focusMode: 'continuous' },
-                            { focusDistance: { min: 0.3, ideal: 1.0 } }, // Minimum 30cm, ideal 1m
-                            { zoom: { exact: 1.0 } }  // Exact zoom = 1 (geen macro zoom)
-                        ]
+                        focusMode: 'continuous',
+                        focusDistance: { min: 0.3, ideal: 1.0 }, // No macro initially
+                        zoom: { ideal: 1.0 }
                     }
                 };
                 
@@ -1073,6 +1182,10 @@
                 video.srcObject = cameraStream;
                 cameraModal.classList.add('visible');
                 
+                // Reset controls
+                currentZoom = 1.0;
+                macroEnabled = false;
+                updateCameraControls();
                 updateCameraPhotoCount();
                 
             } catch (error) {
@@ -1092,6 +1205,113 @@
             }
             
             showStatusBanner('Camera gesloten', 'success');
+        }
+        
+        // Camera control functions
+        async function toggleMacro() {
+            if (!cameraStream) return;
+            
+            macroEnabled = !macroEnabled;
+            
+            try {
+                const videoTrack = cameraStream.getVideoTracks()[0];
+                const constraints = {
+                    focusMode: 'continuous',
+                    zoom: { ideal: currentZoom }
+                };
+                
+                if (macroEnabled) {
+                    // Enable macro: allow close focus
+                    constraints.focusDistance = { min: 0.05, ideal: 0.1 }; // 5cm to 10cm
+                } else {
+                    // Disable macro: prevent close focus
+                    constraints.focusDistance = { min: 0.3, ideal: 1.0 }; // 30cm to 1m
+                }
+                
+                await videoTrack.applyConstraints({ advanced: [constraints] });
+                updateCameraControls();
+                
+                const status = macroEnabled ? 'Macro AAN' : 'Macro UIT';
+                showStatusBanner(status, 'success');
+                
+            } catch (error) {
+                console.error('Macro toggle error:', error);
+                showStatusBanner('Macro aanpassing mislukt', 'error');
+            }
+        }
+        
+        async function adjustZoom(delta) {
+            if (!cameraStream) return;
+            
+            const newZoom = Math.max(1.0, Math.min(2.0, currentZoom + delta)); // Max 2.0x zoom
+            if (newZoom === currentZoom) return;
+            
+            try {
+                const videoTrack = cameraStream.getVideoTracks()[0];
+                const constraints = {
+                    zoom: { ideal: newZoom },
+                    focusMode: 'continuous'
+                };
+                
+                // Apply current macro setting
+                if (macroEnabled) {
+                    constraints.focusDistance = { min: 0.05, ideal: 0.1 };
+                } else {
+                    constraints.focusDistance = { min: 0.3, ideal: 1.0 };
+                }
+                
+                await videoTrack.applyConstraints({ advanced: [constraints] });
+                currentZoom = newZoom;
+                updateCameraControls();
+                
+            } catch (error) {
+                console.error('Zoom error:', error);
+                showStatusBanner('Zoom aanpassing mislukt', 'error');
+            }
+        }
+        
+        async function setZoom(targetZoom) {
+            if (!cameraStream) return;
+            
+            const newZoom = Math.max(1.0, Math.min(2.0, targetZoom));
+            
+            try {
+                const videoTrack = cameraStream.getVideoTracks()[0];
+                const constraints = {
+                    zoom: { ideal: newZoom },
+                    focusMode: 'continuous'
+                };
+                
+                // Apply current macro setting
+                if (macroEnabled) {
+                    constraints.focusDistance = { min: 0.05, ideal: 0.1 };
+                } else {
+                    constraints.focusDistance = { min: 0.3, ideal: 1.0 };
+                }
+                
+                await videoTrack.applyConstraints({ advanced: [constraints] });
+                currentZoom = newZoom;
+                updateCameraControls();
+                showStatusBanner(`Zoom ingesteld op ${newZoom.toFixed(1)}x`, 'success');
+                
+            } catch (error) {
+                console.error('Set zoom error:', error);
+                showStatusBanner('Zoom aanpassing mislukt', 'error');
+            }
+        }
+        
+        function updateCameraControls() {
+            const macroToggle = document.getElementById('macroToggle');
+            const zoomDisplay = document.getElementById('zoomDisplay');
+            
+            if (macroToggle) {
+                macroToggle.textContent = macroEnabled ? 'Macro AAN' : 'Macro UIT';
+                macroToggle.classList.toggle('active', macroEnabled);
+            }
+            
+            if (zoomDisplay) {
+                zoomDisplay.textContent = `${currentZoom.toFixed(1)}x`;
+            }
         }
         
         function capturePhoto() {
